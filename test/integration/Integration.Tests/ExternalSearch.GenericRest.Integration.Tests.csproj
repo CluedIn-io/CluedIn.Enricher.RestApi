@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="CluedIn.CrawlerIntegrationTesting" />
+    <PackageReference Include="CluedIn.Testing.Base" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.GoogleMaps\ExternalSearch.Providers.GenericRest.csproj" />
+  </ItemGroup>
+</Project>
