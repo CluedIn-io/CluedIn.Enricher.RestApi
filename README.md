@@ -17,8 +17,8 @@ docker-compose up --build -d
 Use the following commands to run all `Unit` and `Integration` tests within the repository:
 
 ```Shell
-dotnet test .\ExternalSearch.GoogleMaps.sln --filter Unit
-dotnet test .\ExternalSearch.GoogleMaps.sln --filter Integration
+dotnet test .\ExternalSearch.GenericRest.sln --filter Unit
+dotnet test .\ExternalSearch.GenericRest.sln --filter Integration
 ```
 
 To run [Pester](https://github.com/pester/Pester) `acceptance` tests
