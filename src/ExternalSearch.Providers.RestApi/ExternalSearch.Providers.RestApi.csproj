@@ -1,8 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <ItemGroup>
-        <None Remove="Resources\GenericRest.svg" />
-        <None Remove="Resources\Google_Maps_icon_2020.svg" />
-    </ItemGroup>
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
         <LangVersion>preview</LangVersion>
     </PropertyGroup>
@@ -12,10 +8,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <EmbeddedResource Include="Resources\GenericRest.svg">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
+      <None Remove="Resources\RestApi.svg" />
     </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="Resources\RestApi.svg" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="CluedIn.ExternalSearch" />
         <PackageReference Include="CluedIn.Crawling" />

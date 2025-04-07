@@ -1,10 +1,10 @@
-# Enricher.GenericRest
+# Enricher.RestApi
 
 ## Usage
 
 ### NuGet Packages
 
-To use the `Generic REST` External Search with the `CluedIn` server you will have to add the CluedIn.Enricher.GenericRest nuget package to your environment.
+To use the `REST API` External Search with the `CluedIn` server you will have to add the CluedIn.Enricher.RestApi nuget package to your environment.
 
 ### Running Tests
 
@@ -17,8 +17,8 @@ docker-compose up --build -d
 Use the following commands to run all `Unit` and `Integration` tests within the repository:
 
 ```Shell
-dotnet test .\ExternalSearch.GenericRest.sln --filter Unit
-dotnet test .\ExternalSearch.GenericRest.sln --filter Integration
+dotnet test .\ExternalSearch.RestApi.sln --filter Unit
+dotnet test .\ExternalSearch.RestApi.sln --filter Integration
 ```
 
 To run [Pester](https://github.com/pester/Pester) `acceptance` tests

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest.Models.Companies
+namespace CluedIn.ExternalSearch.Providers.RestApi.Models.Companies
 {
 
 

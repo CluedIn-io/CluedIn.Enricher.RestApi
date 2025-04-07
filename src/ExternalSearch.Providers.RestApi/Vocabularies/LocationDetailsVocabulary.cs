@@ -1,7 +1,7 @@
 ﻿//using CluedIn.Core.Data;
 //using CluedIn.Core.Data.Vocabularies;
 
-//namespace CluedIn.ExternalSearch.Providers.GenericRest.Vocabularies
+//namespace CluedIn.ExternalSearch.Providers.RestApi.Vocabularies
 //{
 //    public class LocationDetailsVocabulary : SimpleVocabulary
 //    {
