@@ -53,7 +53,6 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             public const string ApiKey = "apiKey";
             public const string Headers = "headers";
             public const string VocabularyAndProperties = "vocabularyAndProperties";
-            public const string CountryKey = "countryKey";
             public const string ProcessRequestScript = "processRequestScript";
             public const string ProcessResponseScript = "processResponseScript";
         }
@@ -109,7 +108,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             {
                 DisplayName = "API Key",
                 Type = "password",
-                IsRequired = true,
+                IsRequired = false,
                 Name = KeyName.ApiKey,
                 Help = "The authorization api key for the endpoint that will be used for retrieving data."
             },
@@ -131,19 +130,11 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             },
             new()
             {
-                DisplayName = "Country Vocabulary Key",
-                Type = "vocabularyKeySelector",
-                IsRequired = false,
-                Name = KeyName.CountryKey,
-                Help = "The vocabulary key that contains the countries that will replace the country token in http://{test_api_url}/{country}. (e.g., organization.country)."
-            },
-            new()
-            {
                 DisplayName = "Process Request Script",
                 Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
-                Help = "The script that will be used to process the request."
+                Help = "The JavaScript script that will be used to process the request to external source."
             },
             new()
             {
@@ -151,7 +142,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
                 Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
-                Help = "The script that will be used to process the response."
+                Help = "The JavaScript script that will be used to process the response from external source."
             },
         };
 
