@@ -12,16 +12,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <EmbeddedResource Include="Resources\GenericRest.svg">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
-    </ItemGroup>
-    <ItemGroup>
-        <PackageReference Include="CluedIn.ExternalSearch" />
-        <PackageReference Include="CluedIn.Crawling" />
-        <PackageReference Include="CluedIn.Core" />
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Models\" />
-    </ItemGroup>
+		<EmbeddedResource Include="Resources\GenericRest.svg">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</EmbeddedResource>
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="CluedIn.ExternalSearch" />
+		<PackageReference Include="CluedIn.Crawling" />
+		<PackageReference Include="CluedIn.Core" />
+	</ItemGroup>
+	<ItemGroup>
+		<Folder Include="Models\" />
+	</ItemGroup>
+	<ItemGroup>
+		<InternalsVisibleTo Include="CluedIn.Provider.ExternalSearch.GenericRest" />
+	</ItemGroup>
 </Project>

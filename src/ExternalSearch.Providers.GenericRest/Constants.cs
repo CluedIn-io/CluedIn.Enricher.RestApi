@@ -48,15 +48,33 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
         public struct KeyName
         {
             public const string AcceptedEntityType = "acceptedEntityType";
+            public const string Method = "method";
             public const string Endpoint = "endpoint";
+            public const string ApiKey = "apiKey";
             public const string Headers = "headers";
             public const string VocabularyAndProperties = "vocabularyAndProperties";
+            public const string ProcessRequestScript = "processRequestScript";
+            public const string ProcessResponseScript = "processResponseScript";
         }
 
         public static string About { get; set; } = "The Generic REST Enricher retrieves data resources from a wide variety of endpoints, offering flexible and seamless access to diverse data sources.";
         public static string Icon { get; set; } = "Resources.GenericRest.svg";
         public static string Domain { get; set; } = "N/A";
 
+        private static readonly HashSet<string> SupportedMethodsHashSet = new(StringComparer.OrdinalIgnoreCase)
+        {
+            Get,
+            Post,
+        };
+
+        public const string Get = "GET";
+        public const string Post = "POST";
+
+        public static ICollection<string> SupportedMethods => SupportedMethodsHashSet;
+        public static bool IsValid(string format)
+        {
+            return SupportedMethodsHashSet.Contains(format);
+        }
         public static IEnumerable<Control> Properties { get; set; } = new List<Control>()
         {
             new()
@@ -69,16 +87,35 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             },
             new()
             {
+                DisplayName = "Method",
+                Type = "option",
+                IsRequired = true,
+                Name = KeyName.Method,
+                Help = "The method of endpoint that will be used for retrieving data.",
+                SourceType = ControlSourceType.Dynamic,
+                Source = GenericRestExtendedConfigurationProvider.SourceName,
+                DisplayDependencies = [],
+            },
+            new()
+            {
                 DisplayName = "Endpoint",
                 Type = "input",
-                IsRequired = false,
+                IsRequired = true,
                 Name = KeyName.Endpoint,
                 Help = "The endpoint that will be used for retrieving data."
             },
             new()
             {
+                DisplayName = "API Key",
+                Type = "password",
+                IsRequired = false,
+                Name = KeyName.ApiKey,
+                Help = "The authorization api key for the endpoint that will be used for retrieving data."
+            },
+            new()
+            {
                 DisplayName = "Headers",
-                Type = "input",
+                Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.Headers,
                 Help = "The headers for the endpoint that will be used for retrieving data."
@@ -90,6 +127,22 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
                 IsRequired = false,
                 Name = KeyName.VocabularyAndProperties,
                 Help = "The vocabulary and properties will be sent to the endpoint."
+            },
+            new()
+            {
+                DisplayName = "Process Request Script",
+                Type = "multiline",
+                IsRequired = false,
+                Name = KeyName.ProcessRequestScript,
+                Help = "The JavaScript script that will be used to process the request to external source."
+            },
+            new()
+            {
+                DisplayName = "Process Response Script",
+                Type = "multiline",
+                IsRequired = false,
+                Name = KeyName.ProcessResponseScript,
+                Help = "The JavaScript script that will be used to process the response from external source."
             },
         };
 

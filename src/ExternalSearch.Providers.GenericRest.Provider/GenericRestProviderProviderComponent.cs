@@ -2,7 +2,9 @@ using System.Reflection;
 using Castle.MicroKernel.Registration;
 using CluedIn.Core;
 using CluedIn.Core.Providers;
+using CluedIn.Core.Providers.ExtendedConfiguration;
 using CluedIn.Core.Server;
+using CluedIn.ExternalSearch.Providers.GenericRest;
 using ComponentHost;
 using Constants = CluedIn.ExternalSearch.Providers.GenericRest.Constants;
 
@@ -24,6 +26,7 @@ namespace CluedIn.Provider.ExternalSearch.GenericRest
             // Dev. Note: Potential for compiler warning here ... CA2214: Do not call overridable methods in constructors
             //   this class has been sealed to prevent the CA2214 waring being raised by the compiler
             Container.Register(Component.For<GenericRestProviderProviderComponent>().Instance(this));
+            Container.Register(Component.For<IExtendedConfigurationProvider>().ImplementedBy<GenericRestExtendedConfigurationProvider>().LifestyleSingleton());
         }
 
         /**********************************************************************************************************
