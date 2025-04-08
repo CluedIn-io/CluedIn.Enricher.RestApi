@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 using CluedIn.Core;
 using CluedIn.Core.Providers.ExtendedConfiguration;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest;
+namespace CluedIn.ExternalSearch.Providers.RestApi;
 
-internal class GenericRestExtendedConfigurationProvider : IExtendedConfigurationProvider
+internal class RestApiExtendedConfigurationProvider : IExtendedConfigurationProvider
 {
-    internal const string SourceName = "GenericRestExtendedConfigurationProvider";
+    internal const string SourceName = "RestApiExtendedConfigurationProvider";
     private const int DefaultPageSize = 20;
 
     private static readonly Option[] MethodsOptions = Constants.SupportedMethods

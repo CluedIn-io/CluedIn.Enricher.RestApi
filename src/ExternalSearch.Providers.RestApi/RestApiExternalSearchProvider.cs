@@ -2,11 +2,9 @@
 using CluedIn.Core.Data;
 using CluedIn.Core.Data.Parts;
 using CluedIn.Core.ExternalSearch;
-using CluedIn.Crawling.Helpers;
 using CluedIn.Core.Connectors;
 using CluedIn.Core.Data.Relational;
 using CluedIn.Core.Providers;
-using CluedIn.Core.Data.Vocabularies;
 using EntityType = CluedIn.Core.Data.EntityType;
 using RestSharp;
 using System;
@@ -15,17 +13,16 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-//using CluedIn.ExternalSearch.Providers.GenericRest.Vocabularies;
-using CluedIn.ExternalSearch.Providers.GenericRest.Models;
-using CluedIn.ExternalSearch.Providers.GenericRest.Models.Companies;
-using CluedIn.ExternalSearch.Providers.GenericRest.Models.Locations;
-using CluedIn.ExternalSearch.Providers.GenericRest.Models.PlaceId;
+using CluedIn.ExternalSearch.Providers.RestApi.Models;
+using CluedIn.ExternalSearch.Providers.RestApi.Models.Companies;
+using CluedIn.ExternalSearch.Providers.RestApi.Models.Locations;
+using CluedIn.ExternalSearch.Providers.RestApi.Models.PlaceId;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest
+namespace CluedIn.ExternalSearch.Providers.RestApi
 {
     /// <summary>The googlemaps graph external search provider.</summary>
     /// <seealso cref="ExternalSearchProviderBase" />
-    public class GenericRestExternalSearchProvider : ExternalSearchProviderBase, IExtendedEnricherMetadata, IConfigurableExternalSearchProvider, IExternalSearchProviderWithVerifyConnection
+    public class RestApiExternalSearchProvider : ExternalSearchProviderBase, IExtendedEnricherMetadata, IConfigurableExternalSearchProvider, IExternalSearchProviderWithVerifyConnection
     {
         /**********************************************************************************************************
          * FIELDS
@@ -37,7 +34,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
          * CONSTRUCTORS
          **********************************************************************************************************/
 
-        public GenericRestExternalSearchProvider()
+        public RestApiExternalSearchProvider()
             : base(Constants.ProviderId, DefaultAcceptedEntityTypes)
         {
             var nameBasedTokenProvider = new NameBasedTokenProvider("GoogleMaps");
@@ -53,9 +50,9 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
         public IEnumerable<EntityType> Accepts(IDictionary<string, object> config, IProvider provider) => Accepts(config);
 
         private IEnumerable<EntityType> Accepts(IDictionary<string, object> config)
-            => Accepts(new GenericRestExternalSearchJobData(config));
+            => Accepts(new RestApiExternalSearchJobData(config));
 
-        private IEnumerable<EntityType> Accepts(GenericRestExternalSearchJobData config)
+        private IEnumerable<EntityType> Accepts(RestApiExternalSearchJobData config)
         {
             if (!string.IsNullOrWhiteSpace(config.AcceptedEntityType))
             {
@@ -67,7 +64,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             return DefaultAcceptedEntityTypes;
         }
 
-        private bool Accepts(GenericRestExternalSearchJobData config, EntityType entityTypeToEvaluate)
+        private bool Accepts(RestApiExternalSearchJobData config, EntityType entityTypeToEvaluate)
         {
             var configurableAcceptedEntityTypes = Accepts(config).ToArray();
 
@@ -75,9 +72,9 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
         }
 
         public IEnumerable<IExternalSearchQuery> BuildQueries(ExecutionContext context, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
-            => InternalBuildQueries(context, request, new GenericRestExternalSearchJobData(config));
+            => InternalBuildQueries(context, request, new RestApiExternalSearchJobData(config));
 
-        private IEnumerable<IExternalSearchQuery> InternalBuildQueries(ExecutionContext context, IExternalSearchRequest request, GenericRestExternalSearchJobData config)
+        private IEnumerable<IExternalSearchQuery> InternalBuildQueries(ExecutionContext context, IExternalSearchRequest request, RestApiExternalSearchJobData config)
         {
             if (!Accepts(config, request.EntityMetaData.EntityType))
                 yield break;
@@ -254,7 +251,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
-            var jobData = new GenericRestExternalSearchJobData(config);
+            var jobData = new RestApiExternalSearchJobData(config);
 
             bool isCompany = false;
             var apiToken = jobData.VocabularyAndProperties;
@@ -454,7 +451,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
         public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
         {
             IDictionary<string, object> configDict = config.ToDictionary(entry => entry.Key, entry => entry.Value);
-            var jobData = new GenericRestExternalSearchJobData(configDict);
+            var jobData = new RestApiExternalSearchJobData(configDict);
             var apiToken = jobData.VocabularyAndProperties;
             var client = new RestClient("https://maps.googleapis.com/maps/api");
             var output = "json";

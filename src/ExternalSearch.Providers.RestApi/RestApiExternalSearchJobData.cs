@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using CluedIn.Core.Crawling;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest
+namespace CluedIn.ExternalSearch.Providers.RestApi
 {
-    public class GenericRestExternalSearchJobData : CrawlJobData
+    public class RestApiExternalSearchJobData : CrawlJobData
     {
-        public GenericRestExternalSearchJobData(IDictionary<string, object> configuration)
+        public RestApiExternalSearchJobData(IDictionary<string, object> configuration)
         {
             AcceptedEntityType = GetValue<string>(configuration, Constants.KeyName.AcceptedEntityType);
             Header = GetValue<string>(configuration, Constants.KeyName.Headers);

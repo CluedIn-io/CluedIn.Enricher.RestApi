@@ -2,7 +2,7 @@
 using CluedIn.Core.Data;
 using Newtonsoft.Json;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest.Models.Locations
+namespace CluedIn.ExternalSearch.Providers.RestApi.Models.Locations
 {
     public class AddressComponent
     {

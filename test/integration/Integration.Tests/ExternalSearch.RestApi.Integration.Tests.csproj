@@ -4,6 +4,6 @@
     <PackageReference Include="CluedIn.Testing.Base" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.GenericRest\ExternalSearch.Providers.GenericRest.csproj" />
+    <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.RestApi\ExternalSearch.Providers.RestApi.csproj" />
   </ItemGroup>
 </Project>

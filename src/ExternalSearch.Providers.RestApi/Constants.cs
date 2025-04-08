@@ -4,12 +4,12 @@ using System.Linq;
 using CluedIn.Core.Data.Relational;
 using CluedIn.Core.Providers;
 
-namespace CluedIn.ExternalSearch.Providers.GenericRest
+namespace CluedIn.ExternalSearch.Providers.RestApi
 {
     public static class Constants
     {
-        public const string ComponentName = "GenericRest";
-        public const string ProviderName = "Generic REST";
+        public const string ComponentName = "RestApi";
+        public const string ProviderName = "REST API";
         public static readonly Guid ProviderId = Guid.Parse("98648745-e0da-40cf-8724-8f4fb9fe338a");
         public const string Instruction = """
             [
@@ -36,7 +36,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
                     "type": "list-item",
                     "children": [
                       {
-                        "text": "Add the API key to enable the enricher to retrieve information from a specific API. For example, the Vatlayer enricher requires an access key to authenticate with the Vatlayer API."
+                        "text": "Add the API key to enable the enricher to retrieve information from a specific API"
                       }
                     ]
                   }
@@ -57,8 +57,8 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
             public const string ProcessResponseScript = "processResponseScript";
         }
 
-        public static string About { get; set; } = "The Generic REST Enricher retrieves data resources from a wide variety of endpoints, offering flexible and seamless access to diverse data sources.";
-        public static string Icon { get; set; } = "Resources.GenericRest.svg";
+        public static string About { get; set; } = "The REST API Enricher retrieves data resources from a wide variety of endpoints, offering flexible and seamless access to diverse data sources.";
+        public static string Icon { get; set; } = "Resources.RestApi.svg";
         public static string Domain { get; set; } = "N/A";
 
         private static readonly HashSet<string> SupportedMethodsHashSet = new(StringComparer.OrdinalIgnoreCase)
@@ -93,7 +93,7 @@ namespace CluedIn.ExternalSearch.Providers.GenericRest
                 Name = KeyName.Method,
                 Help = "The method of endpoint that will be used for retrieving data.",
                 SourceType = ControlSourceType.Dynamic,
-                Source = GenericRestExtendedConfigurationProvider.SourceName,
+                Source = RestApiExtendedConfigurationProvider.SourceName,
                 DisplayDependencies = [],
             },
             new()
