@@ -15,12 +15,15 @@
       <EmbeddedResource Include="Resources\RestApi.svg" />
     </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="CluedIn.ExternalSearch" />
-        <PackageReference Include="CluedIn.Crawling" />
-        <PackageReference Include="CluedIn.Core" />
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Models\" />
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="CluedIn.ExternalSearch" />
+		<PackageReference Include="CluedIn.Crawling" />
+		<PackageReference Include="CluedIn.Core" />
+	</ItemGroup>
+	<ItemGroup>
+		<Folder Include="Models\" />
+	</ItemGroup>
+	<ItemGroup>
+		<InternalsVisibleTo Include="CluedIn.Provider.ExternalSearch.GenericRest" />
+	</ItemGroup>
 </Project>
