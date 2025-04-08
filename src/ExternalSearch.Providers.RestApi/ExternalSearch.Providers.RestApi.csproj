@@ -24,6 +24,6 @@
 		<Folder Include="Models\" />
 	</ItemGroup>
 	<ItemGroup>
-		<InternalsVisibleTo Include="CluedIn.Provider.ExternalSearch.GenericRest" />
+		<InternalsVisibleTo Include="CluedIn.Provider.ExternalSearch.RestApi" />
 	</ItemGroup>
 </Project>

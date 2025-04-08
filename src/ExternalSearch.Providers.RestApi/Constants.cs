@@ -93,7 +93,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Name = KeyName.Method,
                 Help = "The method of endpoint that will be used for retrieving data.",
                 SourceType = ControlSourceType.Dynamic,
-                Source = GenericRestExtendedConfigurationProvider.SourceName,
+                Source = RestApiExtendedConfigurationProvider.SourceName,
                 DisplayDependencies = [],
             },
             new()

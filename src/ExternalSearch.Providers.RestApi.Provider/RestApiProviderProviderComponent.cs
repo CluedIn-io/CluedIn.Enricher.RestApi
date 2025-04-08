@@ -4,7 +4,7 @@ using CluedIn.Core;
 using CluedIn.Core.Providers;
 using CluedIn.Core.Providers.ExtendedConfiguration;
 using CluedIn.Core.Server;
-using CluedIn.ExternalSearch.Providers.GenericRest;
+using CluedIn.ExternalSearch.Providers.RestApi;
 using ComponentHost;
 using Constants = CluedIn.ExternalSearch.Providers.RestApi.Constants;
 
