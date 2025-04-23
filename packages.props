@@ -19,7 +19,6 @@
 	  <PackageReference Update="xunit.runner.visualstudio" Version="2.4.1" />
 	  <PackageReference Update="Moq" Version="4.13.1" />
 	  <PackageReference Update="Shouldly" Version="3.0.2" />
-	  <PackageReference Update="jint" Version="4.2.2" />
 	  <PackageReference Update="CluedIn.Testing.Base" Version="4.0.0" />
   </ItemGroup>
   <ItemGroup>
@@ -36,5 +35,6 @@
     <PackageReference Update="CluedIn.Server.Common.WebApi" Version="$(_CluedIn)" />
     <PackageReference Update="CluedIn.ExternalSearch" Version="$(_CluedIn)" />
     <PackageReference Update="CluedIn.Rules" Version="$(_CluedIn)" />
+    <PackageReference Update="jint" Version="4.2.2" />
   </ItemGroup>
 </Project>
