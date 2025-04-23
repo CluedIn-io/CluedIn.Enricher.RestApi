@@ -5,22 +5,25 @@ using CluedIn.Core.ExternalSearch;
 using CluedIn.Core.Connectors;
 using CluedIn.Core.Data.Relational;
 using CluedIn.Core.Providers;
+using CluedIn.Core.Processing;
+using CluedIn.ExternalSearch.Providers.RestApi.Models;
+using CluedIn.Rules.Tokens;
 using EntityType = CluedIn.Core.Data.EntityType;
+using ExecutionContext = CluedIn.Core.ExecutionContext;
+
 using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Extensions.Logging;
-using CluedIn.ExternalSearch.Providers.RestApi.Models;
-using CluedIn.ExternalSearch.Providers.RestApi.Models.Companies;
-using CluedIn.ExternalSearch.Providers.RestApi.Models.Locations;
-using CluedIn.ExternalSearch.Providers.RestApi.Models.PlaceId;
+using Newtonsoft.Json;
 
 namespace CluedIn.ExternalSearch.Providers.RestApi
 {
-    /// <summary>The googlemaps graph external search provider.</summary>
+    /// <summary>The rest api external search provider.</summary>
     /// <seealso cref="ExternalSearchProviderBase" />
     public class RestApiExternalSearchProvider : ExternalSearchProviderBase, IExtendedEnricherMetadata, IConfigurableExternalSearchProvider, IExternalSearchProviderWithVerifyConnection
     {
@@ -28,7 +31,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
          * FIELDS
          **********************************************************************************************************/
 
-        private static readonly EntityType[] DefaultAcceptedEntityTypes = { EntityType.Organization };
+        private static readonly EntityType[] DefaultAcceptedEntityTypes = [EntityType.Organization];
 
         /**********************************************************************************************************
          * CONSTRUCTORS
@@ -37,7 +40,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public RestApiExternalSearchProvider()
             : base(Constants.ProviderId, DefaultAcceptedEntityTypes)
         {
-            var nameBasedTokenProvider = new NameBasedTokenProvider("GoogleMaps");
+            var nameBasedTokenProvider = new NameBasedTokenProvider("RestApi");
 
             if (nameBasedTokenProvider.ApiToken != null)
                 TokenProvider = new RoundRobinTokenProvider(nameBasedTokenProvider.ApiToken.Split(',', ';'));
@@ -57,7 +60,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(config.AcceptedEntityType))
             {
                 // If configured, only accept the configured entity types
-                return new EntityType[] { config.AcceptedEntityType };
+                return [config.AcceptedEntityType];
             }
 
             // Fallback to default accepted entity types
@@ -79,592 +82,560 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!Accepts(config, request.EntityMetaData.EntityType))
                 yield break;
 
-            if (!string.IsNullOrWhiteSpace(config?.Header))
-            {
-                if (request.EntityMetaData.Properties.GetValue(config.Header)?.ToLowerInvariant() != "true")
-                {
-                    context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because VocabularyKey {config.Header} value was not true. Actual value: {request.EntityMetaData.Properties.GetValue(config.Header)}");
-                    yield break;
-                }
-            }
-
-            //var existingResults = request.GetQueryResults<CompanyDetailsResponse>(this).ToList();
-
-            //bool NameFilter(string value)
-            //{
-            //    return existingResults.Any(r => string.Equals(r.Data.Result.Name, value, StringComparison.InvariantCultureIgnoreCase));
-            //}
-
-            //bool AddressFilter(string value)
-            //{
-            //    return existingResults.Any(r => string.Equals(r.Data.Result.FormattedAddress, value, StringComparison.InvariantCultureIgnoreCase));
-            //}
-
             var entityType = request.EntityMetaData.EntityType;
 
-            var configMap = config?.ToDictionary();
-            var organizationName = GetValue(request, configMap, Constants.KeyName.Endpoint);
-            var organizationAddress = GetValue(request, configMap, Constants.KeyName.Headers);
-            var organizationZip = GetValue(request, configMap, Constants.KeyName.VocabularyAndProperties);
-            
-            //if (organizationName != null && organizationName.Count > 0
-            //    && organizationAddress != null && organizationAddress.Count > 0
-            //    && organizationZip != null && organizationZip.Count > 0
-            //    && organizationState != null && organizationState.Count > 0
-            //       && organizationCity != null && organizationCity.Count > 0
-            //    && organizationCountry != null && organizationCountry.Count > 0)
-            //{
-            //    foreach (var nameValue in organizationName.Where(v => !NameFilter(v)))
-            //    {
-            //        foreach (var addressValue in organizationAddress.Where(v => !AddressFilter(v)))
-            //        {
-            //            foreach (var cityValue in organizationCity.Where(v => !AddressFilter(v)))
-            //            {
-            //                foreach (var zipValue in organizationZip.Where(v => !AddressFilter(v)))
-            //                {
-            //                    foreach (var stateValue in organizationState.Where(v => !AddressFilter(v)))
-            //                    {
-            //                        foreach (var countryValue in organizationCountry.Where(v => !AddressFilter(v)))
-            //                        {
-            //                            var companyDict = new Dictionary<string, string>
-            //                            {
-            //                                {"companyName", nameValue },
-            //                                {"companyAddress", $"{addressValue}, {cityValue}, {zipValue}, {stateValue}, {countryValue}" }
-            //                            };
+            var requestInfoConfig = GetRequestConfig(context, request, config);
 
-            //                            yield return new ExternalSearchQuery(this, entityType, companyDict);
-            //                        }
-            //                    }
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
-            //else if (organizationName != null && organizationName.Count > 0 && organizationAddress != null && organizationAddress.Count > 0)
-            //{
-            //    foreach (var nameValue in organizationName.Where(v => !NameFilter(v)))
-            //    {
-            //        foreach (var addressValue in organizationAddress.Where(v => !AddressFilter(v)))
-            //        {
-            //            var companyDict = new Dictionary<string, string>
-            //            {
-            //                {"companyName", nameValue },
-            //                {"companyAddress", addressValue }
-            //            };
-            //            yield return new ExternalSearchQuery(this, entityType, companyDict);
-            //        }
-            //    }
-            //}
+            if (requestInfoConfig.TryGetValue("url", out var urlValue) && string.IsNullOrWhiteSpace(urlValue))
+            {
+                context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because the Url could not be retrieved");
+                throw new InvalidOperationException("Unable to retrieve Url.");
+            }
 
-            //if (organizationName != null && organizationName.Count > 0)
-            //{
-            //    foreach (var value in organizationName.Where(v => !NameFilter(v)))
-            //    {
-            //        var nameDict = new Dictionary<string, string>
-            //        {
-            //            {"companyName", value },
-            //        };
-            //        yield return new ExternalSearchQuery(this, entityType, nameDict);
-            //    }
-            //}
-
-            //if (organizationAddress != null && organizationAddress.Count > 0)
-            //{
-            //    foreach (var value in organizationAddress.Where(v => !AddressFilter(v)))
-            //    {
-            //        var addressDict = new Dictionary<string, string>
-            //        {
-            //            {"companyAddress", value }
-            //        };
-            //        yield return new ExternalSearchQuery(this, entityType, addressDict);
-            //    }
-            //}
-
-            //if (locationAddress != null && locationAddress.Count > 0)
-            //{
-            //    foreach (var locationNameValue in locationAddress.Where(v => !AddressFilter(v)))
-            //    {
-            //        var locationDict = new Dictionary<string, string>
-            //                {
-            //                    {"locationName", locationNameValue },
-            //                    {"coordinates", $"{latitude.FirstOrDefault() ?? string.Empty},{longitude.FirstOrDefault() ?? string.Empty}" }
-            //                };
-
-            //        yield return new ExternalSearchQuery(this, entityType, locationDict);
-            //    }
-            //}
-
-
-            //if (personAddress != null && personAddress.Count > 0 && personAddressCity != null && personAddressCity.Count > 0)
-            //{
-            //    foreach (var locationNameValue in personAddress.Where(v => !AddressFilter(v)))
-            //    {
-            //        foreach (var locationCityValue in personAddressCity.Where(v => !AddressFilter(v)))
-            //        {
-
-            //            var locationDict = new Dictionary<string, string>
-            //            {
-            //                {"locationName", $"{locationNameValue}, {locationCityValue}" },
-            //                {"coordinates", $"{latitude.FirstOrDefault() ?? string.Empty},{longitude.FirstOrDefault() ?? string.Empty}" }
-            //            };
-
-            //            yield return new ExternalSearchQuery(this, entityType, locationDict);
-            //        }
-            //    }
-            //}
-            //else if (personAddress != null && personAddress.Count > 0)
-            //{
-            //    foreach (var locationNameValue in personAddress.Where(v => !AddressFilter(v)))
-            //    {
-            //        var locationDict = new Dictionary<string, string>
-            //            {
-            //                {"locationName", locationNameValue },
-            //                {"coordinates", $"{latitude.FirstOrDefault() ?? string.Empty},{longitude.FirstOrDefault() ?? string.Empty}" }
-            //            };
-
-            //        yield return new ExternalSearchQuery(this, entityType, locationDict);
-            //    }
-            //}
-
-            //if (userAddress != null && userAddress.Count > 0)
-            //{
-            //    foreach (var locationNameValue in userAddress.Where(v => !AddressFilter(v)))
-            //    {
-            //        var locationDict = new Dictionary<string, string>
-            //        {
-            //            {"locationName", locationNameValue },
-            //            {"coordinates", $"{latitude.FirstOrDefault() ?? string.Empty},{longitude.FirstOrDefault() ?? string.Empty}" }
-            //        };
-
-            //        yield return new ExternalSearchQuery(this, entityType, locationDict);
-            //    }
-            //}
-        }
-
-        private static HashSet<string> GetValue(IExternalSearchRequest request, IDictionary<string, object> config, string keyName)
-        {
-            if (!config.TryGetValue(keyName, out var customVocabKey) || string.IsNullOrWhiteSpace(customVocabKey?.ToString())) return [];
-
-            var value = request.QueryParameters.GetValue(customVocabKey.ToString(), []);
-            return value;
+            yield return new ExternalSearchQuery(this, entityType, requestInfoConfig);
         }
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
             var jobData = new RestApiExternalSearchJobData(config);
-
-            bool isCompany = false;
-            var apiToken = jobData.VocabularyAndProperties;
-
-            var client = new RestClient("https://maps.googleapis.com/maps/api");
-            var output = "json";
-            var placeDetailsEndpoint = $"place/details/{output}?";
-            var placeIdEndpoint = $"place/textsearch/{output}?";
-
-            var placeIdRequest = new RestRequest(placeIdEndpoint, Method.GET);
-            placeIdRequest.AddQueryParameter("key", apiToken);
-
-            if (query.QueryParameters.ContainsKey("companyName") || query.QueryParameters.ContainsKey("companyAddress"))
+            var body = string.Empty;
+            if (query.QueryParameters.ContainsKey("properties"))
             {
-                var input = new
-                {
-                    name = query.QueryParameters.TryGetValue("companyName", out var name) ? name.FirstOrDefault() : string.Empty,
-                    address = query.QueryParameters.TryGetValue("companyAddress", out var address) ? address.FirstOrDefault() : string.Empty
-                };
-                var encodedInput = input.name + " " + input.address;
-                placeIdRequest.AddQueryParameter("query", encodedInput);
-
-                isCompany = true;
+                body = query.QueryParameters.TryGetValue("properties", out var properties)
+                    ? properties.FirstOrDefault()
+                    : string.Empty;
             }
-            else
+
+            var url = string.Empty;
+            if (query.QueryParameters.ContainsKey("url"))
             {
-                if (query.QueryParameters.ContainsKey("locationName"))
+                url = query.QueryParameters.TryGetValue("url", out var urlValue)
+                    ? urlValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(url))
+            {
+                context.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
+                    ExternalSearchQueryParameter.Identifier);
+            }
+
+            url = ReplaceTokens(url, jobData);
+
+            var request = new RequestDto
+            {
+                Method = jobData.Method,
+                Url = url,
+                Headers = GetHeaders(jobData),
+                ApiKey = jobData.ApiKey,
+                Body = new BodyDto
                 {
-                    placeIdRequest.AddParameter("query", query.QueryParameters["locationName"].First());
+                    Properties = JsonConvert.DeserializeObject<List<PropertyDto>>(body ?? string.Empty)
+                }
+            };
+
+            if (!string.IsNullOrWhiteSpace(jobData.ProcessRequestScript))
+            {
+                using var engine = new Jint.Engine()
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                    .SetValue("request", request)
+                    .Execute(jobData.ProcessRequestScript);
+
+                request = engine.GetValue("request").ToObject() as RequestDto;
+            }
+
+            if (request == null || string.IsNullOrWhiteSpace(request.Url)) {
+                context.Log.LogTrace($"Skipped enrichment for record {Name} because Url is null or empty");
+                yield break; //TODO Log if null
+            }
+
+            var client = new RestClient(request.Url);
+            var restRequest = new RestRequest(GetHttpMethod(request.Method));
+
+            foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
+            {
+                restRequest.AddHeader(header.Key, header.Value);
+            }
+
+            restRequest.AddJsonBody(request.Body);
+            var restResponse = client.ExecuteAsync(restRequest).Result;
+
+            context.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
+
+            var responseDto = new ResponseDto
+            {
+                HttpStatus = restResponse.StatusCode.ToString(),
+                Content = restResponse.Content,
+                ContentType = restResponse.ContentType,
+                Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
+            };
+
+            if (!string.IsNullOrWhiteSpace(jobData.ProcessResponseScript))
+            {
+                using var engine = new Jint.Engine()
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}" )))
+                    .SetValue("response", responseDto)
+                    .Execute(jobData.ProcessResponseScript);
+
+                var response = engine.GetValue("response").ToObject() as ResponseDto;
+                responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
+
+                if (string.IsNullOrWhiteSpace(responseDto.Content))
+                {
+                    context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
+                    yield break;
                 }
 
-                if (query.QueryParameters.ContainsKey("coordinates"))
-                {
-                    var transformedCoordinates = string.Join("", query.QueryParameters["coordinates"]);
-                    var splitCoordinates = transformedCoordinates.Split(',');
-                    placeIdRequest.AddParameter("location", $"{splitCoordinates[0]} {splitCoordinates[1]}");
-                }
+                context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
             }
 
-            IRestResponse<PlaceIdResponse> placeIdResponse = null;
-
-            try
+            if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString())
             {
-                context.Log.LogTrace("Making Google Maps call. Request: ", JsonUtility.Serialize(placeIdRequest.Parameters));
-                placeIdResponse = client.ExecuteAsync<PlaceIdResponse>(placeIdRequest).Result;
-            }
-            catch (Exception exception)
-            {
-                context.Log.LogError("Could not fetch PlaceIdResponse from Google Maps", exception);
+                Thread.Sleep(2000);
+                throw new Exception($"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}"); // hack the message must start with 'Too many requests' for the core to retry
             }
 
-            if (placeIdResponse == null)
-            {
-                yield break;
-            }
+            if (responseDto.HttpStatus != HttpStatusCode.OK.ToString()) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
-            if (placeIdResponse.Data.Status.Equals("REQUEST_DENIED"))
-            {
-                context.Log.LogError("REQUEST DENIED by Google Maps");
-                yield break;
-            }
+            var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
-            if (placeIdResponse.StatusCode == HttpStatusCode.OK)
-            {
-                if (placeIdResponse.Data != null && isCompany == false)
-                {
-                    var request = new RestRequest(placeDetailsEndpoint, Method.GET);
-                    foreach (var placeId in placeIdResponse.Data.Results)
-                    {
-                        request.AddParameter("placeid", placeId.PlaceId);
-                        request.AddParameter("key", apiToken);
-                    }
+            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
 
-                    var response = client.ExecuteAsync<LocationDetailsResponse>(request).Result;
-                    if (response.Data.Status.Equals("REQUEST_DENIED"))
-                    {
-                        yield break;
-                    }
-
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        if (response.Data != null)
-                            yield return new ExternalSearchQueryResult<LocationDetailsResponse>(query, response.Data);
-                    }
-                    else if (response.StatusCode == HttpStatusCode.NoContent || response.StatusCode == HttpStatusCode.NotFound)
-                        yield break;
-                    else if (response.ErrorException != null)
-                        throw new AggregateException(response.ErrorException.Message, response.ErrorException);
-                    else
-                        throw new ApplicationException("Could not execute external search query - StatusCode:" + response.StatusCode + "; Content: " + response.Content);
-                }
-                else
-                {
-                    var request = new RestRequest(placeDetailsEndpoint, Method.GET);
-                    foreach (var placeId in placeIdResponse.Data.Results)
-                    {
-                        request.AddParameter("placeid", placeId.PlaceId);
-                        request.AddParameter("key", apiToken);
-                    }
-
-                    IRestResponse<CompanyDetailsResponse> response = null;
-
-                    try
-                    {
-                        context.Log.LogTrace("Making Google Maps call. Request: ", JsonUtility.Serialize(request.Parameters));
-                        response = client.ExecuteAsync<CompanyDetailsResponse>(request).Result;
-                    }
-                    catch (Exception exception)
-                    {
-                        context.Log.LogError("Could not fetch CompanyDetailsResponse from Google Maps", exception);
-                    }
-
-                    if (response == null)
-                    {
-                        yield break;
-                    }
-
-                    if (response.Data.Status.Equals("REQUEST_DENIED"))
-                    {
-                        context.Log.LogError("REQUEST DENIED by Google Maps");
-                        yield break;
-                    }
-
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        if (response.Data != null)
-                            yield return new ExternalSearchQueryResult<CompanyDetailsResponse>(query, response.Data);
-                    }
-                    else if (response.StatusCode == HttpStatusCode.NoContent || response.StatusCode == HttpStatusCode.NotFound)
-                        yield break;
-                    else if (response.ErrorException != null)
-                        throw new AggregateException(response.ErrorException.Message, response.ErrorException);
-                    else
-                        throw new ApplicationException("Could not execute external search query - StatusCode:" + response.StatusCode + "; Content: " + response.Content);
-                }
-            }
         }
 
         public IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
         {
-            if (result is IExternalSearchQueryResult<LocationDetailsResponse> locationDetailsResult)
+            using (context.Log.BeginScope("{0} {1}: query {2}, request {3}, result {4}", GetType().Name, "BuildClues", query, request, result))
             {
-                var clue = new Clue(request.EntityMetaData.OriginEntityCode, context.Organization);
-                clue.Data.EntityData.Codes.Add(request.EntityMetaData.Codes.First());
+                var resultItem = result.As<ResultsDto[]>();
+                var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
+                    $"{query.QueryKey}{request.EntityMetaData.OriginEntityCode}"
+                        .ToDeterministicGuid());
+                var clue = new Clue(code, context.Organization);
 
-                PopulateLocationMetadata(clue.Data.EntityData, locationDetailsResult, request);
+                PopulateMetadata(clue.Data.EntityData, resultItem, request);
 
-                // TODO: If necessary, you can create multiple clues and return them.
+                var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+                if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
+                    this.DownloadPreviewImage(context, property, clue);
 
-                return new[] { clue };
+                context.Log.LogInformation(
+                    "Clue produced, Id: '{Id}' OriginEntityCode: '{OriginEntityCode}' RawText: '{RawText}'", clue.Id,
+                    clue.OriginEntityCode, clue.RawText);
+
+                return [clue];
             }
-            else if (result is IExternalSearchQueryResult<CompanyDetailsResponse> companyResult)
-            {
-
-                var clue = new Clue(request.EntityMetaData.OriginEntityCode, context.Organization);
-
-                PopulateCompanyMetadata(clue.Data.EntityData, companyResult, request);
-
-                // TODO: If necessary, you can create multiple clues and return them.
-
-                return new[] { clue };
-            }
-
-            return null;
         }
 
         public IEntityMetadata GetPrimaryEntityMetadata(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
         {
-            if (result is IExternalSearchQueryResult<LocationDetailsResponse> locationResult)
+            using (context.Log.BeginScope("{0} {1}: request {2}, result {3}", GetType().Name, "GetPrimaryEntityMetadata",
+                       request, result))
             {
-                if (locationResult.Data.Result != null)
-                {
-                    return CreateLocationMetadata(locationResult, request);
-                }
-            }
-            else if (result is IExternalSearchQueryResult<CompanyDetailsResponse> companyResult)
-            {
-                if (companyResult.Data.Result != null)
-                {
-                    return CreateCompanyMetadata(companyResult, request);
-                }
-            }
+                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request);
 
-            return null;
+                context.Log.LogInformation(
+                    "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
+                    metadata.Name, metadata.OriginEntityCode.Origin.Code);
+
+                return metadata;
+            }
         }
 
-        public override IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request)
-        {
-            return null;
-        }
 
         public IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
         {
+            var metadata = GetPrimaryEntityMetadata(context, result, request, config, provider);
+            var logoKey = metadata.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+            if (!string.IsNullOrEmpty(logoKey) && metadata.Properties.TryGetValue(logoKey, out var value))
+            {
+                return DownloadPreviewImageBlob(context, value);
+            }
+
             return null;
         }
 
         public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
         {
-            IDictionary<string, object> configDict = config.ToDictionary(entry => entry.Key, entry => entry.Value);
-            var jobData = new RestApiExternalSearchJobData(configDict);
-            var apiToken = jobData.VocabularyAndProperties;
-            var client = new RestClient("https://maps.googleapis.com/maps/api");
-            var output = "json";
-            var placeDetailsEndpoint = $"place/details/{output}?";
-            var placeIdEndpoint = $"place/textsearch/{output}?";
+            var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
 
-            var placeIdRequest = new RestRequest(placeIdEndpoint, Method.GET);
-            placeIdRequest.AddQueryParameter("key", apiToken);
-            placeIdRequest.AddQueryParameter("query", "Google 1600 Amphitheatre Parkway, Mountain View, CA 94043.");
-
-            IRestResponse<PlaceIdResponse> placeIdResponse = null;
-            try
+            if (string.IsNullOrWhiteSpace(data.Url))
             {
-                placeIdResponse = client.ExecuteAsync<PlaceIdResponse>(placeIdRequest).Result;
-            }
-            catch (Exception exception)
-            {
-                return new ConnectionVerificationResult(false, $"Could not fetch company details from Google Maps. {exception.Message}");
+                return new ConnectionVerificationResult(false, "Url must not be blank");
             }
 
-            if (!placeIdResponse.IsSuccessful)
+            if (string.IsNullOrWhiteSpace(data.Method))
             {
-                return ConstructVerifyConnectionResponse(placeIdResponse);
+                return new ConnectionVerificationResult(false, "Method must not be blank");
             }
 
-            if (placeIdResponse.StatusCode != HttpStatusCode.OK)
-                return new ConnectionVerificationResult(true, string.Empty);
-
-            var request = new RestRequest(placeDetailsEndpoint, Method.GET);
-            foreach (var placeId in placeIdResponse.Data.Results)
+            if (data.Url.Contains("Vocabulary:"))
             {
-                request.AddParameter("placeid", placeId.PlaceId);
-                request.AddParameter("key", apiToken);
+                return new ConnectionVerificationResult(false, "Please replace {Vocabulary:xxx} in url with actual value to test connection");
             }
-
-            IRestResponse<CompanyDetailsResponse> response;
 
             try
             {
-                response = client.ExecuteAsync<CompanyDetailsResponse>(request).Result;
-            }
-            catch (Exception exception)
-            {
-                return new ConnectionVerificationResult(false, $"Could not fetch CompanyDetailsResponse from Google Maps. {exception}");
-            }
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
+                var url = ReplaceTokens(data.Url, data);
+                var request = new RequestDto
+                {
+                    Method = data.Method,
+                    Url = url,
+                    Headers = GetHeaders(data),
+                    ApiKey = data.ApiKey,
+                    Body = new BodyDto
+                    {
+                        Properties = body
+                    }
+                };
 
-            return response == null ? new ConnectionVerificationResult(true, string.Empty) : ConstructVerifyConnectionResponse(placeIdResponse);
+                if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
+                {
+                    using var requestEngine = new Jint.Engine()
+                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                        .SetValue("request", request)
+                        .Execute(data.ProcessRequestScript);
+
+                    request = requestEngine.GetValue("request").ToObject() as RequestDto;
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.Url))
+                {
+                    return new ConnectionVerificationResult(false, $"Url - {request?.Url} is invalid");
+                }
+
+                var client = new RestClient(request.Url);
+                var restRequest = new RestRequest(GetHttpMethod(request.Method));
+
+                foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value)))
+                {
+                    restRequest.AddHeader(header.Key, header.Value);
+                }
+
+                restRequest.AddJsonBody(request.Body);
+                var restResponse = client.ExecuteAsync(restRequest).Result;
+
+                var responseDto = new ResponseDto
+                {
+                    HttpStatus = restResponse.StatusCode.ToString(),
+                    Content = restResponse.Content,
+                    ContentType = restResponse.ContentType,
+                    Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
+                };
+
+                if (string.IsNullOrWhiteSpace(data.ProcessResponseScript)) return new ConnectionVerificationResult(true);
+
+                using var responseEngine = new Jint.Engine()
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                    .SetValue("response", responseDto)
+                    .Execute(data.ProcessResponseScript);
+
+                var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
+                responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
+
+                if (string.IsNullOrWhiteSpace(responseDto.Content))
+                {
+                    return new ConnectionVerificationResult(false, "Response Content after Calling User Script is null or empty");
+                }
+
+                if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString()) return new ConnectionVerificationResult(false, $"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
+
+                return responseDto.HttpStatus != HttpStatusCode.OK.ToString() ? new ConnectionVerificationResult(false, $"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}") : new ConnectionVerificationResult(true);
+            }
+            catch (Exception ex) 
+            { 
+                return new ConnectionVerificationResult(false, ex.Message);
+            }
         }
 
-        private ConnectionVerificationResult ConstructVerifyConnectionResponse<T>(IRestResponse<T> response)
-        {
-            var errorMessageBase = $"{Constants.ProviderName} returned \"{(int)response.StatusCode} {response.StatusDescription}\".";
-
-            if (response.ErrorException != null)
-            {
-                return new ConnectionVerificationResult(
-                    false,
-                    $"{errorMessageBase} {(!string.IsNullOrWhiteSpace(response.ErrorException.Message) ? response.ErrorException.Message : "This could be due to breaking changes in the external system")}."
-                );
-            }
-
-            dynamic responseData = response.Data;
-            if (responseData != null && responseData.Status != null &&
-                responseData.Status.Equals("REQUEST_DENIED") || response.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                return new ConnectionVerificationResult(false, $"{errorMessageBase} This could be due to an invalid API key.");
-            }
-
-            var regex = new Regex(@"\<(html|head|body|div|span|img|p\>|a href)", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace);
-            var isHtml = regex.IsMatch(response.Content);
-
-            var errorMessage = response.IsSuccessful
-                ? string.Empty
-                : string.IsNullOrWhiteSpace(response.Content) || isHtml
-                    ? $"{errorMessageBase} This could be due to breaking changes in the external system."
-                    : $"{errorMessageBase} {response.Content}.";
-
-            return new ConnectionVerificationResult(response.IsSuccessful, errorMessage);
-        }
-
-        private IEntityMetadata CreateLocationMetadata(IExternalSearchQueryResult<LocationDetailsResponse> resultItem, IExternalSearchRequest request)
+        private IEntityMetadata CreateMetadata(IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request)
         {
             var metadata = new EntityMetadataPart();
 
-            PopulateLocationMetadata(metadata, resultItem, request);
+            PopulateMetadata(metadata, resultItem, request);
 
             return metadata;
         }
 
-        private IEntityMetadata CreateCompanyMetadata(IExternalSearchQueryResult<CompanyDetailsResponse> resultItem, IExternalSearchRequest request)
+        private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem,
+            IExternalSearchRequest request)
         {
-            var metadata = new EntityMetadataPart();
-
-            PopulateCompanyMetadata(metadata, resultItem, request);
-
-            return metadata;
-        }
-
-        private void PopulateLocationMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<LocationDetailsResponse> resultItem, IExternalSearchRequest request)
-        {
+            var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
+                $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
+                    .ToDeterministicGuid());
             metadata.EntityType = request.EntityMetaData.EntityType;
             metadata.Name = request.EntityMetaData.Name;
-            metadata.OriginEntityCode = request.EntityMetaData.OriginEntityCode;
+            metadata.OriginEntityCode = code;
+            metadata.Codes.Add(request.EntityMetaData.OriginEntityCode);
 
-            ////metadata.Properties[GoogleMapsVocabulary.Location.ComponentsAddress] = JsonUtility.Serialize(resultItem.Data.Result.AddressComponents);
-            //foreach (var component in resultItem.Data.Result.AddressComponents)
-            //{
-            //    switch (component.Types.First())
-            //    {
-            //        case "route":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.NameStreet] = component.ShortName;
-            //            break;
-            //        case "colloquial_area":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.NameCity] = component.ShortName;
-            //            break;
-            //        case "locality":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.NameCity] = component.ShortName;
-            //            break;
-            //        case "administrative_area_level_1":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.AdministrativeArea] = component.ShortName;
-            //            break;
-            //        case "country":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.CodeCountry] = component.ShortName;
-            //            break;
-            //        case "postal_code":
-            //            metadata.Properties[GoogleMapsVocabulary.Location.CodePostal] = component.ShortName;
-            //            break;
-            //    }
-
-            //}
-
-            //metadata.Properties[GoogleMapsVocabulary.Location.Name] = resultItem.Data.Result.Name.PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Location.Geometry] = JsonUtility.Serialize(resultItem.Data.Result.Geometry);
-            //metadata.Properties[GoogleMapsVocabulary.Location.Latitude] = resultItem.Data.Result.Geometry.Location.Lat;
-            //metadata.Properties[GoogleMapsVocabulary.Location.Longitude] = resultItem.Data.Result.Geometry.Location.Lng;
-            //metadata.Properties[GoogleMapsVocabulary.Location.FormattedAddress] = resultItem.Data.Result.FormattedAddress.PrintIfAvailable();
+            foreach (var enrichmentResult in resultItem.Data)
+            {
+                using var en = enrichmentResult.Data.GetEnumerator();
+                while (en.MoveNext())
+                {
+                    var key = en.Current.Key;
+                    key = SanitizeVocabularyKey(key); //TODO Maybe the key can be sanitized in the end of ExecuteSearch(), but the Dictionary results need to be updated
+                    metadata.Properties[key] = en.Current.Value.ToString();
+                }
+            }
         }
 
-        private void PopulateCompanyMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<CompanyDetailsResponse> resultItem, IExternalSearchRequest request)
+        /// <summary>
+        /// Sanitize vocabulary key strings by removing non-alphanumeric characters and converting them to camel case.
+        /// </summary>
+        /// <param name="vocabularyKey">The vocabulary key string</param>
+        /// <returns></returns>
+        private static string SanitizeVocabularyKey(string vocabularyKey)
         {
-            metadata.EntityType = request.EntityMetaData.EntityType;
-            metadata.Name = request.EntityMetaData.Name;
-            metadata.OriginEntityCode = request.EntityMetaData.OriginEntityCode;
+            var alphaNumeric = Regex.Replace(vocabularyKey, "[^a-zA-Z0-9. ]", "");
+            var segments = alphaNumeric.Split('.');
 
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.AddressComponents] = JsonUtility.Serialize(resultItem.Data.Result.AddressComponents);
-            //foreach (var component in resultItem.Data.Result.AddressComponents)
-            //{
-            //    switch (component.Types.First())
-            //    {
-            //        case "street_number":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.StreetNumber] = component.ShortName;
-            //            break;
-            //        case "route":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.StreetName] = component.ShortName;
-            //            break;
-            //        case "locality":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.CityName] = component.ShortName;
-            //            break;
-            //        case "country":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.CountryCode] = component.ShortName;
-            //            break;
-            //        case "postal_code":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.PostalCode] = component.ShortName;
-            //            break;
-            //        case "subpremise":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.SubPremise] = component.ShortName;
-            //            break;
-            //        case "administrative_area_level_1":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.AdministrativeAreaLevel1] = component.ShortName;
-            //            break;
-            //        case "administrative_area_level_2":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.AdministrativeAreaLevel2] = component.ShortName;
-            //            break;
-            //        case "neighborhood":
-            //            metadata.Properties[GoogleMapsVocabulary.Organization.Neighborhood] = component.ShortName;
-            //            break;
-            //    }
+            return string.Join(".",
+                segments.Select((segment, index) =>
+                {
+                    if (string.IsNullOrEmpty(segment))
+                        return null;
 
-            //}
-
-            //metadata.Properties[GoogleMapsVocabulary.Organization.AdrAddress] = resultItem.Data.Result.AdrAddress.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.FormattedAddress] = resultItem.Data.Result.FormattedAddress.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.FormattedPhoneNumber] = resultItem.Data.Result.FormattedPhoneNumber.PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.Geometry] = resultItem.Data.Result.Geometry.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Longitude] = resultItem.Data.Result.Geometry.Location.Lng.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Latitude] = resultItem.Data.Result.Geometry.Location.Lat.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Icon] = resultItem.Data.Result.Icon.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Id] = resultItem.Data.Result.PlaceId.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.InternationalPhoneNumber] = resultItem.Data.Result.InternationalPhoneNumber.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Name] = resultItem.Data.Result.Name.PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.OpeningHours] = resultItem.Data.Result.OpeningHours.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.PlaceId] = resultItem.Data.Result.PlaceId.PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.PlusCode] = JsonUtility.Serialize(resultItem.Data.Result.PlusCode);
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Rating] = resultItem.Data.Result.Rating.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Reference] = resultItem.Data.Result.Reference.PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.Reviews] = JsonUtility.Serialize(resultItem.Data.Result.Reviews);
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.Scope] = resultItem.Data.Result..PrintIfAvailable();
-            ////metadata.Properties[GoogleMapsVocabulary.Organization.Types] = resultItem.Data.Result.Types.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Url] = resultItem.Data.Result.Url.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.UserRatingsTotal] = resultItem.Data.Result.UserRatingsTotal.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.UtcOffset] = resultItem.Data.Result.UtcOffset.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Vicinity] = resultItem.Data.Result.Vicinity.PrintIfAvailable();
-            //metadata.Properties[GoogleMapsVocabulary.Organization.Website] = resultItem.Data.Result.Website.PrintIfAvailable();
-
-            //metadata.Properties[GoogleMapsVocabulary.Organization.BusinessStatus] = resultItem.Data.Result.BusinessStatus.PrintIfAvailable();
+                    return index == segments.Length - 1 ? // Check if this is the last segment
+                        FormatLabelToProperty(segment) :
+                        // Convert to lowercase
+                        segment.Replace(" ", "");
+                }));
         }
 
-        // Since this is a configurable external search provider, theses methods should never be called
+        /// <summary>
+        /// Formats the label so it fits the style of the properties (e.g. "Company type" -> "companyType")
+        /// </summary>
+        /// <param name="label">The label to format</param>
+        /// <returns>The formatted label</returns>
+        private static string FormatLabelToProperty(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+                return null;
+
+            if (IsAllUpperCase(label))
+                return label.ToLower();
+
+            if (IsAllUpperCase(label) || IsCamelCase(label)) 
+                return label;
+
+            // Convert to camelCase: first word lowercase, others capitalize first letter
+            return string.Join("", label.Split(' ').Select((word, i) =>
+                i == 0 ? FirstCharacterToLower(word) : FirstCharacterToUpper(word)));
+        }
+
+        private static bool IsAllUpperCase(string text)
+        {
+            return Regex.IsMatch(text, "^[A-Z]+$");
+        }
+
+        private static bool IsCamelCase(string text)
+        {
+            // Check if first character is lowercase and there’s at least one uppercase letter
+            return char.IsLower(text[0]) && text.Any(char.IsUpper);
+        }
+
+        /// <summary>
+        /// Capitalizes the first character in the string
+        /// </summary>
+        /// <param name="text">The text that should be capitalized</param>
+        /// <returns>The string with the first character capitalized</returns>
+        private static string FirstCharacterToUpper(string text)
+        {
+            return $"{char.ToUpper(text[0])}{text[1..]}";
+        }
+
+        /// <summary>
+        /// Capitalizes the first character in the string
+        /// </summary>
+        /// <param name="text">The text that should be capitalized</param>
+        /// <returns>The string with the first character capitalized</returns>
+        private static string FirstCharacterToLower(string text)
+        {
+            return $"{char.ToLower(text[0])}{text[1..]}";
+        }
+
+        /// <summary>
+        /// Retrieve the HTTP request details from the enricher configuration.
+        /// </summary>
+        /// <param name="context">Execution context</param>
+        /// <param name="request">External Search Request</param>
+        /// <param name="config">Enricher Configurations</param>
+        /// <returns></returns>
+        private static Dictionary<string, string> GetRequestConfig(ExecutionContext context, IExternalSearchRequest request, RestApiExternalSearchJobData config)
+        {
+            var configMap = config?.ToDictionary();
+
+            var requestInfoDict = new Dictionary<string, string>();
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Method, out var method) && !string.IsNullOrWhiteSpace(method?.ToString()))
+            {
+                requestInfoDict.Add("method", method.ToString());
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Url, out var url) && !string.IsNullOrWhiteSpace(url?.ToString()))
+            {
+                var tokenParser = context.ApplicationContext.Container.Resolve<IRuleTokenParser<IRuleActionToken>>();
+                var parsedUrl = tokenParser.Parse((ProcessingContext)context, request.EntityMetaData as IEntityMetadataPart, url.ToString());
+                requestInfoDict.Add("url", parsedUrl);
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.ApiKey, out var apiKey) && !string.IsNullOrWhiteSpace(apiKey?.ToString()))
+            {
+                requestInfoDict.Add("apiKey", apiKey.ToString());
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.VocabularyAndProperties, out var vocabularyAndProperties) && !string.IsNullOrWhiteSpace(vocabularyAndProperties?.ToString()))
+            {
+                var properties = GetProperties(request, vocabularyAndProperties.ToString());
+                requestInfoDict.Add("properties", JsonConvert.SerializeObject(properties));
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.ProcessRequestScript, out var processRequestScript) && !string.IsNullOrWhiteSpace(processRequestScript?.ToString()))
+            {
+                requestInfoDict.Add("processRequestScript", processRequestScript.ToString());
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.ProcessResponseScript, out var processResponseScript) && !string.IsNullOrWhiteSpace(processResponseScript?.ToString()))
+            {
+                requestInfoDict.Add("processResponseScript", processResponseScript.ToString());
+            }
+
+            return requestInfoDict;
+        }
+
+        /// <summary>
+        /// Retrieve the HTTP request headers from the enricher configuration.
+        /// </summary>
+        /// <param name="jobData">Job Data</param>
+        /// <returns></returns>
+        /// <exception cref="FormatException"></exception>
+        private static List<HeaderDto> GetHeaders(RestApiExternalSearchJobData jobData)
+        {
+            var input = jobData.Headers;
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return [];
+            }
+
+            // Replace the {APIKey} token in Headers with actual API Key
+            input = ReplaceTokens(input, jobData);
+
+            var result = new List<HeaderDto>();
+
+            foreach (var line in input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var parts = line.Split('=');
+                if (parts.Length != 2)
+                {
+                    throw new FormatException($"Invalid line format: {line}");
+                }
+
+                result.Add(new HeaderDto
+                {
+                    Key = parts[0].Trim(),
+                    Value = parts[1].Trim()
+                });
+            }
+
+            return result;
+        }
+
+        private static string ReplaceTokens(string input, RestApiExternalSearchJobData jobData)
+        {
+            if (input.Contains("{APIKey}"))
+            {
+                input = input.Replace("{APIKey}", jobData.ApiKey);
+            }
+
+            return input;
+        }
+
+        /// <summary>
+        /// Retrieve the properties and construct an HTTP request body.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="properties"></param>
+        /// <returns></returns>
+        private static List<PropertyDto> GetProperties(IExternalSearchRequest request, string properties)
+        {
+            var result = new List<PropertyDto>();
+            var listOfProperties = properties.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var property in listOfProperties)
+            {
+                if (string.IsNullOrWhiteSpace(property)) continue;
+                var value = request.QueryParameters.GetValue(property, []);
+
+                if (value.FirstOrDefault() != null)
+                {
+                    result.Add(new PropertyDto
+                    {
+                        Key = property,
+                        Value = value.FirstOrDefault()
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Retrieve the properties and construct an HTTP request body for test connection.
+        /// </summary>
+        /// <param name="properties"></param>
+        /// <returns></returns>
+        private static List<PropertyDto> GetPropertiesTestConnection(string properties)
+        {
+            var result = new List<PropertyDto>();
+            var listOfProperties = properties.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var property in listOfProperties)
+            {
+                if (string.IsNullOrWhiteSpace(property)) continue;
+                const string value = "DummyTestValue";
+
+                result.Add(new PropertyDto
+                {
+                    Key = property,
+                    Value = value
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Retrieve the HTTP request method.
+        /// </summary>
+        /// <param name="methodString"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        private static Method GetHttpMethod(string methodString)
+        {
+            if (string.IsNullOrEmpty(methodString))
+            {
+                throw new ArgumentNullException(nameof(methodString), "Method string cannot be null or empty.");
+            }
+
+            return methodString.ToLower() switch
+            {
+                "get" => Method.GET,
+                "post" => Method.POST,
+                _ => throw new ArgumentException($"Unsupported HTTP method: {methodString}. Expected 'get' or 'post'.",
+                    nameof(methodString))
+            };
+        }
+
+        // Since this is a configurable external search provider, these methods should never be called
         public override bool Accepts(EntityType entityType) => throw new NotSupportedException();
         public override IEnumerable<IExternalSearchQuery> BuildQueries(ExecutionContext context, IExternalSearchRequest request) => throw new NotSupportedException();
         public override IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query) => throw new NotSupportedException();
         public override IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
         public override IEntityMetadata GetPrimaryEntityMetadata(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
+        public override IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
 
         /**********************************************************************************************************
          * PROPERTIES

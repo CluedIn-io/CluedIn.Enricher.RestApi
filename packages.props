@@ -5,21 +5,21 @@
     <_CluedIn>4.5.0-alpha.*</_CluedIn>
   </PropertyGroup>
   <ItemGroup>
-    <!--
+	  <!--
         Specified versions for dependencies in test projects
         MUST SPECIFY IN CSPROJ AS <PackageReference Name="<depName>" />
     -->
-    <PackageReference Update="Microsoft.NET.Test.Sdk" Version="16.5.0" />
-    <PackageReference Update="AutoFixture.Xunit2" Version="$(_AutoFixture)" />
-    <PackageReference Update="AutoFixture.Idioms" Version="$(_AutoFixture)" />
-    <PackageReference Update="AutoFixture.AutoMoq" Version="$(_AutoFixture)" />
-    <PackageReference Update="coverlet.msbuild" Version="2.8.0" />
-    <PackageReference Update="Serilog.Sinks.XUnit" Version="1.0.21" />
-    <PackageReference Update="xunit" Version="2.4.1" />
-    <PackageReference Update="xunit.runner.visualstudio" Version="2.4.1" />
-    <PackageReference Update="Moq" Version="4.13.1" />
-    <PackageReference Update="Shouldly" Version="3.0.2" />
-    <PackageReference Update="CluedIn.Testing.Base" Version="4.0.0" />
+	  <PackageReference Update="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+	  <PackageReference Update="AutoFixture.Xunit2" Version="$(_AutoFixture)" />
+	  <PackageReference Update="AutoFixture.Idioms" Version="$(_AutoFixture)" />
+	  <PackageReference Update="AutoFixture.AutoMoq" Version="$(_AutoFixture)" />
+	  <PackageReference Update="coverlet.msbuild" Version="2.8.0" />
+	  <PackageReference Update="Serilog.Sinks.XUnit" Version="1.0.21" />
+	  <PackageReference Update="xunit" Version="2.4.1" />
+	  <PackageReference Update="xunit.runner.visualstudio" Version="2.4.1" />
+	  <PackageReference Update="Moq" Version="4.13.1" />
+	  <PackageReference Update="Shouldly" Version="3.0.2" />
+	  <PackageReference Update="CluedIn.Testing.Base" Version="4.0.0" />
   </ItemGroup>
   <ItemGroup>
     <!--
@@ -34,5 +34,7 @@
     <PackageReference Update="CluedIn.Server" Version="$(_CluedIn)" />
     <PackageReference Update="CluedIn.Server.Common.WebApi" Version="$(_CluedIn)" />
     <PackageReference Update="CluedIn.ExternalSearch" Version="$(_CluedIn)" />
+    <PackageReference Update="CluedIn.Rules" Version="$(_CluedIn)" />
+    <PackageReference Update="jint" Version="4.2.2" />
   </ItemGroup>
 </Project>

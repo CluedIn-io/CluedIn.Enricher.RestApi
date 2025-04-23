@@ -49,7 +49,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         {
             public const string AcceptedEntityType = "acceptedEntityType";
             public const string Method = "method";
-            public const string Endpoint = "endpoint";
+            public const string Url = "url";
             public const string ApiKey = "apiKey";
             public const string Headers = "headers";
             public const string VocabularyAndProperties = "vocabularyAndProperties";
@@ -71,11 +71,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public const string Post = "POST";
 
         public static ICollection<string> SupportedMethods => SupportedMethodsHashSet;
-        public static bool IsValid(string format)
-        {
-            return SupportedMethodsHashSet.Contains(format);
-        }
-        public static IEnumerable<Control> Properties { get; set; } = new List<Control>()
+
+        public static IEnumerable<Control> Properties { get; set; } = new List<Control>
         {
             new()
             {
@@ -94,15 +91,23 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Help = "The method of endpoint that will be used for retrieving data.",
                 SourceType = ControlSourceType.Dynamic,
                 Source = RestApiExtendedConfigurationProvider.SourceName,
-                DisplayDependencies = [],
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Url,
+                        Operator = ControlDependencyOperator.Exists,
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.None,
+                    }
+                ],
             },
             new()
             {
-                DisplayName = "Endpoint",
+                DisplayName = "Url",
                 Type = "input",
                 IsRequired = true,
-                Name = KeyName.Endpoint,
-                Help = "The endpoint that will be used for retrieving data."
+                Name = KeyName.Url,
+                Help = "The endpoint url that will be used for retrieving data."
             },
             new()
             {
@@ -123,7 +128,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             new()
             {
                 DisplayName = "Vocabulary and Properties",
-                Type = "input",
+                Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.VocabularyAndProperties,
                 Help = "The vocabulary and properties will be sent to the endpoint."
@@ -134,7 +139,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
-                Help = "The JavaScript script that will be used to process the request to external source."
+                Help = "The JavaScript script that will be used to process the request to external source.",
+                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}}
             },
             new()
             {
@@ -142,7 +148,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
-                Help = "The JavaScript script that will be used to process the response from external source."
+                Help = "The JavaScript script that will be used to process the response from external source.",
+                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}}
             },
         };
 
