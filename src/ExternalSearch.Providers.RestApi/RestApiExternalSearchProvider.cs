@@ -21,7 +21,6 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-
 namespace CluedIn.ExternalSearch.Providers.RestApi
 {
     /// <summary>The rest api external search provider.</summary>
@@ -121,7 +120,6 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     ExternalSearchQueryParameter.Identifier);
             }
 
-
             var request = new RequestDto
             {
                 Method = jobData.Method,
@@ -161,7 +159,6 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             var restResponse = client.ExecuteAsync(restRequest).Result;
 
             context.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
-
 
             var responseDto = new ResponseDto
             {
@@ -209,11 +206,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             using (context.Log.BeginScope("{0} {1}: query {2}, request {3}, result {4}", GetType().Name, "BuildClues", query, request, result))
             {
                 var resultItem = result.As<ResultsDto[]>();
-                var clue = new Clue(new EntityCode(request.EntityMetaData.EntityType, "RestApi", query.QueryKey.ToDeterministicGuid()), context.Organization);
-
-                clue.Data.EntityData.Codes.Add(request.EntityMetaData.OriginEntityCode);
+                var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
+                    $"{query.QueryKey}{request.EntityMetaData.OriginEntityCode}"
+                        .ToDeterministicGuid());
+                var clue = new Clue(code, context.Organization);
 
                 PopulateMetadata(clue.Data.EntityData, resultItem, request);
+
+                var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+                if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
+                    this.DownloadPreviewImage(context, property, clue);
 
                 context.Log.LogInformation(
                     "Clue produced, Id: '{Id}' OriginEntityCode: '{OriginEntityCode}' RawText: '{RawText}'", clue.Id,
@@ -238,62 +240,60 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
         }
 
-        public override IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request)
-        {
-            return null;
-        }
 
         public IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
         {
+            var metadata = GetPrimaryEntityMetadata(context, result, request, config, provider);
+            var logoKey = metadata.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+            if (!string.IsNullOrEmpty(logoKey) && metadata.Properties.TryGetValue(logoKey, out var value))
+            {
+                return DownloadPreviewImageBlob(context, value);
+            };
+
             return null;
         }
 
         public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
         {
-            var url = config[Constants.KeyName.Url] as string;
-            var method = config[Constants.KeyName.Method] as string;
-            var headers = config[Constants.KeyName.Headers] as string;
-            var apiKey = config[Constants.KeyName.ApiKey] as string;
-            var properties = config[Constants.KeyName.VocabularyAndProperties] as String;
-            var processRequestScript = config[Constants.KeyName.ProcessRequestScript] as string;
-            var processResponseScript = config[Constants.KeyName.ProcessResponseScript] as string;
+            var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
 
-            if (string.IsNullOrWhiteSpace(url))
+            if (string.IsNullOrWhiteSpace(data.Url))
             {
                 return new ConnectionVerificationResult(false, "Url must not be blank");
             }
 
-            if (string.IsNullOrWhiteSpace(method))
+            if (string.IsNullOrWhiteSpace(data.Method))
             {
                 return new ConnectionVerificationResult(false, "Method must not be blank");
             }
 
-            if (url.Contains("Vocabulary:"))
+            if (data.Url.Contains("Vocabulary:"))
             {
                 return new ConnectionVerificationResult(false, "Please replace {Vocabulary:xxx} in url with actual value to test connection");
             }
 
             try
             {
-                var body = string.IsNullOrWhiteSpace(properties) ? null : GetPropertiesTestConnection(properties);
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
 
                 var request = new RequestDto
                 {
-                    Method = method,
-                    Url = url,
-                    Headers = GetHeaders(headers, apiKey),
-                    ApiKey = apiKey,
+                    Method = data.Method,
+                    Url = data.Url,
+                    Headers = GetHeaders(data.Headers, data.ApiKey),
+                    ApiKey = data.ApiKey,
                     Body = new BodyDto
                     {
                         Properties = body
                     }
                 };
 
-                if (!string.IsNullOrWhiteSpace(processRequestScript))
+                if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
                 {
                     using var requestEngine = new Jint.Engine()
+                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, o?.ToString())))
                         .SetValue("request", request)
-                        .Execute(processRequestScript);
+                        .Execute(data.ProcessRequestScript);
 
                     request = requestEngine.GetValue("request").ToObject() as RequestDto;
                 }
@@ -322,12 +322,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
                 };
 
-                if (string.IsNullOrWhiteSpace(processResponseScript)) return new ConnectionVerificationResult(true);
+                if (string.IsNullOrWhiteSpace(data.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                     .SetValue("response", responseDto)
-                    .Execute(processResponseScript);
+                    .Execute(data.ProcessResponseScript);
 
                 var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
@@ -359,9 +359,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem,
             IExternalSearchRequest request)
         {
+            var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
+                $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
+                    .ToDeterministicGuid());
             metadata.EntityType = request.EntityMetaData.EntityType;
             metadata.Name = request.EntityMetaData.Name;
-            metadata.OriginEntityCode = request.EntityMetaData.OriginEntityCode;
+            metadata.OriginEntityCode = code;
+            metadata.Codes.Add(request.EntityMetaData.OriginEntityCode);
 
             foreach (var enrichmentResult in resultItem.Data)
             {
@@ -622,6 +626,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public override IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query) => throw new NotSupportedException();
         public override IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
         public override IEntityMetadata GetPrimaryEntityMetadata(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
+        public override IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request) => throw new NotSupportedException();
 
         /**********************************************************************************************************
          * PROPERTIES
