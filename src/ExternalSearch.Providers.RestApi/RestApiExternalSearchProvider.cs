@@ -137,7 +137,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(jobData.ProcessRequestScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, o?.ToString())))
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .Execute(jobData.ProcessRequestScript);
 
@@ -152,7 +152,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             var client = new RestClient(request.Url);
             var restRequest = new RestRequest(GetHttpMethod(request.Method));
 
-            foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value)))
+            foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
             {
                 restRequest.AddHeader(header.Key, header.Value);
             }
@@ -191,7 +191,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString())
             {
-                Thread.Sleep(2000); // while developing we observed that the error message says to retry in 2s
+                Thread.Sleep(2000);
                 throw new Exception($"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}"); // hack the message must start with 'Too many requests' for the core to retry
             }
 
@@ -293,7 +293,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
                 {
                     using var requestEngine = new Jint.Engine()
-                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, o?.ToString())))
+                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                         .SetValue("request", request)
                         .Execute(data.ProcessRequestScript);
 
