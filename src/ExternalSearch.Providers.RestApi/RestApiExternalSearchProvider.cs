@@ -120,11 +120,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     ExternalSearchQueryParameter.Identifier);
             }
 
+            url = ReplaceTokens(url, jobData);
+
             var request = new RequestDto
             {
                 Method = jobData.Method,
                 Url = url,
-                Headers = GetHeaders(jobData.Headers, jobData.ApiKey),
+                Headers = GetHeaders(jobData),
                 ApiKey = jobData.ApiKey,
                 Body = new BodyDto
                 {
@@ -248,7 +250,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrEmpty(logoKey) && metadata.Properties.TryGetValue(logoKey, out var value))
             {
                 return DownloadPreviewImageBlob(context, value);
-            };
+            }
 
             return null;
         }
@@ -275,12 +277,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             try
             {
                 var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
-
+                var url = ReplaceTokens(data.Url, data);
                 var request = new RequestDto
                 {
                     Method = data.Method,
-                    Url = data.Url,
-                    Headers = GetHeaders(data.Headers, data.ApiKey),
+                    Url = url,
+                    Headers = GetHeaders(data),
                     ApiKey = data.ApiKey,
                     Body = new BodyDto
                     {
@@ -506,22 +508,19 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         /// <summary>
         /// Retrieve the HTTP request headers from the enricher configuration.
         /// </summary>
-        /// <param name="input">Headers</param>
-        /// <param name="apiKey">API Key</param>
+        /// <param name="jobData">Job Data</param>
         /// <returns></returns>
         /// <exception cref="FormatException"></exception>
-        private static List<HeaderDto> GetHeaders(string input, string apiKey)
+        private static List<HeaderDto> GetHeaders(RestApiExternalSearchJobData jobData)
         {
+            var input = jobData.Headers;
             if (string.IsNullOrWhiteSpace(input))
             {
                 return [];
             }
 
             // Replace the {APIKey} token in Headers with actual API Key
-            if (input.Contains("{APIKey}"))
-            {
-                input = input.Replace("{APIKey}", apiKey);
-            }
+            input = ReplaceTokens(input, jobData);
 
             var result = new List<HeaderDto>();
 
@@ -543,6 +542,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
 
             return result;
+        }
+
+        private static string ReplaceTokens(string input, RestApiExternalSearchJobData jobData)
+        {
+            if (input.Contains("{APIKey}"))
+            {
+                input = input.Replace("{APIKey}", jobData.ApiKey);
+            }
+
+            return input;
         }
 
         /// <summary>
