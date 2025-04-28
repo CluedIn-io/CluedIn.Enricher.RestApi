@@ -469,6 +469,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 requestInfoDict.Add("method", method.ToString());
             }
 
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Headers, out var headers) && !string.IsNullOrWhiteSpace(headers?.ToString()))
+            {
+                requestInfoDict.Add("headers", headers.ToString());
+            }
+
             if (configMap != null && configMap.TryGetValue(Constants.KeyName.Url, out var url) && !string.IsNullOrWhiteSpace(url?.ToString()))
             {
                 var tokenParser = context.ApplicationContext.Container.Resolve<IRuleTokenParser<IRuleActionToken>>();
@@ -648,6 +653,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             {
                 parameters.Method = query.QueryParameters.TryGetValue("method", out var methodValue)
                     ? methodValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("headers"))
+            {
+                parameters.Headers = query.QueryParameters.TryGetValue("headers", out var headersValue)
+                    ? headersValue.FirstOrDefault()
                     : string.Empty;
             }
 
