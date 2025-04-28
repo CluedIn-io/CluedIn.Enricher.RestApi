@@ -453,7 +453,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             return $"{char.ToLower(text[0])}{text[1..]}";
         }
         
-        private class EncoderRuleActionToken(IRuleActionToken inner) : IRuleActionToken
+        private class EncodedRuleActionToken(IRuleActionToken inner) : IRuleActionToken
         {
             public string Resolve(ProcessingContext context, IEntityMetadataPart entityMetadataPart, string input)
             {
@@ -501,7 +501,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 childContainer.Register(Component.For<IEnumerable<IRuleActionToken>>()
                     .UsingFactoryMethod(() =>
                         context.ApplicationContext.Container.ResolveAll<IRuleActionToken>()
-                            .Select(x => new EncoderRuleActionToken(x))).LifestyleTransient().IsDefault());
+                            .Select(x => new EncodedRuleActionToken(x))).LifestyleTransient().IsDefault());
 
                 var tokenParser = childContainer.Resolve<IRuleTokenParser<IRuleActionToken>>();
                 var parsedUrl = tokenParser.Parse((ProcessingContext)context, request.EntityMetaData as IEntityMetadataPart, url.ToString());
