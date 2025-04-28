@@ -18,6 +18,10 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Web;
+using Castle.Core;
+using Castle.DynamicProxy;
+using Castle.MicroKernel.Registration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -450,6 +454,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         {
             return $"{char.ToLower(text[0])}{text[1..]}";
         }
+        
+        private class EncoderRuleActionToken(IRuleActionToken inner) : IRuleActionToken
+        {
+            public string Resolve(ProcessingContext context, IEntityMetadataPart entityMetadataPart, string input)
+            {
+                return HttpUtility.UrlEncode(inner.Resolve(context, entityMetadataPart, input));
+            }
+
+            public string Key => inner.Key;
+        }
 
         /// <summary>
         /// Retrieve the HTTP request details from the enricher configuration.
@@ -476,7 +490,22 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (configMap != null && configMap.TryGetValue(Constants.KeyName.Url, out var url) && !string.IsNullOrWhiteSpace(url?.ToString()))
             {
-                var tokenParser = context.ApplicationContext.Container.Resolve<IRuleTokenParser<IRuleActionToken>>();
+                var parserType = context.ApplicationContext.Container.Resolve<IRuleTokenParser<IRuleActionToken>>().GetType();
+
+                using var childContainer = context.ApplicationContext.Container.CreateInheritedContainer();
+
+                // the core loves singletons, so lets re-register as transient so we can intercept the IRuleActionToken and encode the result
+                childContainer.Register(Component.For<IRuleTokenParser<IRuleActionToken>>()
+                    .ImplementedBy(parserType)
+                    .LifestyleTransient().IsDefault());
+
+                // re-register the IRuleActionToken with wrapped versions that encode the output
+                childContainer.Register(Component.For<IEnumerable<IRuleActionToken>>()
+                    .UsingFactoryMethod(() =>
+                        context.ApplicationContext.Container.ResolveAll<IRuleActionToken>()
+                            .Select(x => new EncoderRuleActionToken(x))).LifestyleTransient().IsDefault());
+
+                var tokenParser = childContainer.Resolve<IRuleTokenParser<IRuleActionToken>>();
                 var parsedUrl = tokenParser.Parse((ProcessingContext)context, request.EntityMetaData as IEntityMetadataPart, url.ToString());
                 requestInfoDict.Add("url", parsedUrl);
             }
@@ -524,7 +553,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             var result = new List<HeaderDto>();
 
-            foreach (var line in input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in input.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
@@ -563,7 +592,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         private static List<PropertyDto> GetProperties(IExternalSearchRequest request, string properties)
         {
             var result = new List<PropertyDto>();
-            var listOfProperties = properties.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            var listOfProperties = properties.Split(new[] {'\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
             foreach (var property in listOfProperties)
             {
                 if (string.IsNullOrWhiteSpace(property)) continue;
@@ -590,7 +619,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         private static List<PropertyDto> GetPropertiesTestConnection(string properties)
         {
             var result = new List<PropertyDto>();
-            var listOfProperties = properties.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            var listOfProperties = properties.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var property in listOfProperties)
             {
                 if (string.IsNullOrWhiteSpace(property)) continue;
