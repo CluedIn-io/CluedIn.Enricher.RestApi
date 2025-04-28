@@ -19,8 +19,6 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web;
-using Castle.Core;
-using Castle.DynamicProxy;
 using Castle.MicroKernel.Registration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
