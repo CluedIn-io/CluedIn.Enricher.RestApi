@@ -457,7 +457,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         {
             public string Resolve(ProcessingContext context, IEntityMetadataPart entityMetadataPart, string input)
             {
-                return HttpUtility.UrlEncode(inner.Resolve(context, entityMetadataPart, input));
+                return Uri.EscapeDataString(inner.Resolve(context, entityMetadataPart, input));
             }
 
             public string Key => inner.Key;
