@@ -97,49 +97,34 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
-            var jobData = new RestApiExternalSearchJobData(config);
-            var body = string.Empty;
-            if (query.QueryParameters.ContainsKey("properties"))
-            {
-                body = query.QueryParameters.TryGetValue("properties", out var properties)
-                    ? properties.FirstOrDefault()
-                    : string.Empty;
-            }
+            var queryParameters = GetQueryParameters(query);
 
-            var url = string.Empty;
-            if (query.QueryParameters.ContainsKey("url"))
-            {
-                url = query.QueryParameters.TryGetValue("url", out var urlValue)
-                    ? urlValue.FirstOrDefault()
-                    : string.Empty;
-            }
-
-            if (string.IsNullOrEmpty(url))
+            if (string.IsNullOrEmpty(queryParameters.Url))
             {
                 context.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
                     ExternalSearchQueryParameter.Identifier);
             }
 
-            url = ReplaceTokens(url, jobData);
+            queryParameters.Url = ReplaceTokens(queryParameters.Url, queryParameters);
 
             var request = new RequestDto
             {
-                Method = jobData.Method,
-                Url = url,
-                Headers = GetHeaders(jobData),
-                ApiKey = jobData.ApiKey,
+                Method = queryParameters.Method,
+                Url = queryParameters.Url,
+                Headers = GetHeaders(queryParameters),
+                ApiKey = queryParameters.ApiKey,
                 Body = new BodyDto
                 {
-                    Properties = JsonConvert.DeserializeObject<List<PropertyDto>>(body ?? string.Empty)
+                    Properties = JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty)
                 }
             };
 
-            if (!string.IsNullOrWhiteSpace(jobData.ProcessRequestScript))
+            if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
                 using var engine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                     .SetValue("request", request)
-                    .Execute(jobData.ProcessRequestScript);
+                    .Execute(queryParameters.ProcessRequestScript);
 
                 request = engine.GetValue("request").ToObject() as RequestDto;
             }
@@ -170,12 +155,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
             };
 
-            if (!string.IsNullOrWhiteSpace(jobData.ProcessResponseScript))
+            if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
                 using var engine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}" )))
                     .SetValue("response", responseDto)
-                    .Execute(jobData.ProcessResponseScript);
+                    .Execute(queryParameters.ProcessResponseScript);
 
                 var response = engine.GetValue("response").ToObject() as ResponseDto;
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
@@ -258,44 +243,54 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
         {
             var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
+            var queryParametersTestConnection = new QueryParameters
+            {
+                Url = data.Url,
+                Body = data.VocabularyAndProperties,
+                Method = data.Method,
+                ApiKey = data.ApiKey,
+                Headers = data.Headers,
+                ProcessRequestScript = data.ProcessRequestScript,
+                ProcessResponseScript = data.ProcessResponseScript
+            };
 
-            if (string.IsNullOrWhiteSpace(data.Url))
+            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Url))
             {
                 return new ConnectionVerificationResult(false, "Url must not be blank");
             }
 
-            if (string.IsNullOrWhiteSpace(data.Method))
+            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Method))
             {
                 return new ConnectionVerificationResult(false, "Method must not be blank");
             }
 
-            if (data.Url.Contains("Vocabulary:"))
+            if (queryParametersTestConnection.Url.Contains("Vocabulary:"))
             {
                 return new ConnectionVerificationResult(false, "Please replace {Vocabulary:xxx} in url with actual value to test connection");
             }
 
             try
             {
-                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
-                var url = ReplaceTokens(data.Url, data);
+                var body = string.IsNullOrWhiteSpace(queryParametersTestConnection.Body) ? null : GetPropertiesTestConnection(queryParametersTestConnection.Body);
+                var url = ReplaceTokens(queryParametersTestConnection.Url, queryParametersTestConnection);
                 var request = new RequestDto
                 {
-                    Method = data.Method,
+                    Method = queryParametersTestConnection.Method,
                     Url = url,
-                    Headers = GetHeaders(data),
-                    ApiKey = data.ApiKey,
+                    Headers = GetHeaders(queryParametersTestConnection),
+                    ApiKey = queryParametersTestConnection.ApiKey,
                     Body = new BodyDto
                     {
                         Properties = body
                     }
                 };
 
-                if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
+                if (!string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessRequestScript))
                 {
                     using var requestEngine = new Jint.Engine()
                         .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                         .SetValue("request", request)
-                        .Execute(data.ProcessRequestScript);
+                        .Execute(queryParametersTestConnection.ProcessRequestScript);
 
                     request = requestEngine.GetValue("request").ToObject() as RequestDto;
                 }
@@ -324,12 +319,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
                 };
 
-                if (string.IsNullOrWhiteSpace(data.ProcessResponseScript)) return new ConnectionVerificationResult(true);
+                if (string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
                     .SetValue("response", responseDto)
-                    .Execute(data.ProcessResponseScript);
+                    .Execute(queryParametersTestConnection.ProcessResponseScript);
 
                 var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
@@ -474,6 +469,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 requestInfoDict.Add("method", method.ToString());
             }
 
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Headers, out var headers) && !string.IsNullOrWhiteSpace(headers?.ToString()))
+            {
+                requestInfoDict.Add("headers", headers.ToString());
+            }
+
             if (configMap != null && configMap.TryGetValue(Constants.KeyName.Url, out var url) && !string.IsNullOrWhiteSpace(url?.ToString()))
             {
                 var tokenParser = context.ApplicationContext.Container.Resolve<IRuleTokenParser<IRuleActionToken>>();
@@ -508,19 +508,19 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         /// <summary>
         /// Retrieve the HTTP request headers from the enricher configuration.
         /// </summary>
-        /// <param name="jobData">Job Data</param>
+        /// <param name="queryParameters">Enrichment Query Parameters</param>
         /// <returns></returns>
         /// <exception cref="FormatException"></exception>
-        private static List<HeaderDto> GetHeaders(RestApiExternalSearchJobData jobData)
+        private static List<HeaderDto> GetHeaders(QueryParameters queryParameters)
         {
-            var input = jobData.Headers;
+            var input = queryParameters.Headers;
             if (string.IsNullOrWhiteSpace(input))
             {
                 return [];
             }
 
             // Replace the {APIKey} token in Headers with actual API Key
-            input = ReplaceTokens(input, jobData);
+            input = ReplaceTokens(input, queryParameters);
 
             var result = new List<HeaderDto>();
 
@@ -544,11 +544,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             return result;
         }
 
-        private static string ReplaceTokens(string input, RestApiExternalSearchJobData jobData)
+        private static string ReplaceTokens(string input, QueryParameters queryParameters)
         {
             if (input.Contains("{APIKey}"))
             {
-                input = input.Replace("{APIKey}", jobData.ApiKey);
+                input = input.Replace("{APIKey}", queryParameters.ApiKey);
             }
 
             return input;
@@ -627,6 +627,71 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 _ => throw new ArgumentException($"Unsupported HTTP method: {methodString}. Expected 'get' or 'post'.",
                     nameof(methodString))
             };
+        }
+
+        private static QueryParameters GetQueryParameters(IExternalSearchQuery query)
+        {
+            var parameters = new QueryParameters
+            {
+                Url = string.Empty,
+                Body = string.Empty,
+                Method = string.Empty,
+                ApiKey = string.Empty,
+                Headers = string.Empty,
+                ProcessRequestScript = string.Empty,
+                ProcessResponseScript = string.Empty
+            };
+
+            if (query.QueryParameters.ContainsKey("properties"))
+            {
+                parameters.Body = query.QueryParameters.TryGetValue("properties", out var properties)
+                    ? properties.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("method"))
+            {
+                parameters.Method = query.QueryParameters.TryGetValue("method", out var methodValue)
+                    ? methodValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("headers"))
+            {
+                parameters.Headers = query.QueryParameters.TryGetValue("headers", out var headersValue)
+                    ? headersValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("url"))
+            {
+                parameters.Url = query.QueryParameters.TryGetValue("url", out var urlValue)
+                    ? urlValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("apiKey"))
+            {
+                parameters.ApiKey = query.QueryParameters.TryGetValue("apiKey", out var apiKeyValue)
+                    ? apiKeyValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("processRequestScript"))
+            {
+                parameters.ProcessRequestScript = query.QueryParameters.TryGetValue("processRequestScript", out var processRequestScriptValue)
+                    ? processRequestScriptValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("processResponseScript"))
+            {
+                parameters.ProcessResponseScript = query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
+                    ? processResponseScripValue.FirstOrDefault()
+                    : string.Empty;
+            }
+
+            return parameters;
         }
 
         // Since this is a configurable external search provider, these methods should never be called
