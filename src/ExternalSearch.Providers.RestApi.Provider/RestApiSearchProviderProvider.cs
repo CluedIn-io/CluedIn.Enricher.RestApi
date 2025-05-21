@@ -9,18 +9,18 @@ using CluedIn.Core.ExternalSearch;
 using CluedIn.Core.Providers;
 using CluedIn.Core.Webhooks;
 using CluedIn.ExternalSearch;
-using CluedIn.ExternalSearch.Providers.GenericRest;
-//using CluedIn.ExternalSearch.Providers.GenericRest.Vocabularies;
+using CluedIn.ExternalSearch.Providers.RestApi;
+//using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using CluedIn.Providers.Models;
-using Constants = CluedIn.ExternalSearch.Providers.GenericRest.Constants;
+using Constants = CluedIn.ExternalSearch.Providers.RestApi.Constants;
 
-namespace CluedIn.Provider.ExternalSearch.GenericRest
+namespace CluedIn.Provider.ExternalSearch.RestApi
 {
-    public class GenericRestSearchProviderProvider : ProviderBase, IExtendedProviderMetadata, IExternalSearchProviderProvider
+    public class RestApiSearchProviderProvider : ProviderBase, IExtendedProviderMetadata, IExternalSearchProviderProvider
     {
         public IExternalSearchProvider ExternalSearchProvider { get; }
 
-        public GenericRestSearchProviderProvider([System.Diagnostics.CodeAnalysis.NotNull] ApplicationContext appContext) : base(appContext, GetMetaData())
+        public RestApiSearchProviderProvider([System.Diagnostics.CodeAnalysis.NotNull] ApplicationContext appContext) : base(appContext, GetMetaData())
         {
             ExternalSearchProvider = appContext.Container.ResolveAll<IExternalSearchProvider>().Single(n => n.Id == Constants.ProviderId);
         }
@@ -45,7 +45,7 @@ namespace CluedIn.Provider.ExternalSearch.GenericRest
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
 
-            var result = new GenericRestExternalSearchJobData(configuration);
+            var result = new RestApiExternalSearchJobData(configuration);
 
             return await Task.FromResult(result);
         }
@@ -63,12 +63,12 @@ namespace CluedIn.Provider.ExternalSearch.GenericRest
 
         public override async Task<IDictionary<string, object>> GetHelperConfiguration(ProviderUpdateContext context, CrawlJobData jobData, Guid organizationId, Guid userId, Guid providerDefinitionId)
         {
-            if (jobData is GenericRestExternalSearchJobData result)
+            if (jobData is RestApiExternalSearchJobData result)
             {
                 return await Task.FromResult(result.ToDictionary());
             }
 
-            throw new InvalidOperationException($"Unexpected data type for {nameof(GenericRestExternalSearchJobData)}, {jobData.GetType()}");
+            throw new InvalidOperationException($"Unexpected data type for {nameof(RestApiExternalSearchJobData)}, {jobData.GetType()}");
         }
 
         public override Task<IDictionary<string, object>> GetHelperConfiguration(ProviderUpdateContext context, CrawlJobData jobData, Guid organizationId, Guid userId, Guid providerDefinitionId, string folderId)

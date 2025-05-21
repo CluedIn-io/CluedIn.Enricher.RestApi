@@ -12,6 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-	<ProjectReference Include="..\ExternalSearch.Providers.GenericRest\ExternalSearch.Providers.GenericRest.csproj" />
+	<ProjectReference Include="..\ExternalSearch.Providers.RestApi\ExternalSearch.Providers.RestApi.csproj" />
   </ItemGroup>
 </Project>
