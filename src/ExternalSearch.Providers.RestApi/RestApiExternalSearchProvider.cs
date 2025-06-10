@@ -14,12 +14,14 @@ using ExecutionContext = CluedIn.Core.ExecutionContext;
 using RestSharp;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web;
 using Castle.MicroKernel.Registration;
+using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -374,6 +376,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     var key = en.Current.Key;
                     key = SanitizeVocabularyKey(key); //TODO Maybe the key can be sanitized in the end of ExecuteSearch(), but the Dictionary results need to be updated
                     metadata.Properties[key] = en.Current.Value.ToString();
+                }
+
+                if (enrichmentResult.Data.Count > 0)
+                {
+                    metadata.Properties[RestApiVocabulary.Organization.ConfidenceScore] = enrichmentResult.Score.ToString(CultureInfo.InvariantCulture);
                 }
             }
         }
