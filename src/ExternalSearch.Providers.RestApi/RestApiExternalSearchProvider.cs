@@ -124,7 +124,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .Execute(queryParameters.ProcessRequestScript);
 
@@ -160,7 +160,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}" )))
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
                     .SetValue("request", request)
                     .SetValue("response", responseDto)
                     .Execute(queryParameters.ProcessResponseScript);
@@ -291,7 +291,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (!string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessRequestScript))
                 {
                     using var requestEngine = new Jint.Engine()
-                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                         .SetValue("request", request)
                         .Execute(queryParametersTestConnection.ProcessRequestScript);
 
@@ -325,7 +325,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("response", responseDto)
                     .Execute(queryParametersTestConnection.ProcessResponseScript);
