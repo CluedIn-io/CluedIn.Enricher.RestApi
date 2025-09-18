@@ -163,6 +163,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             {
                 using var engine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}" )))
+                    .SetValue("request", request)
                     .SetValue("response", responseDto)
                     .Execute(queryParameters.ProcessResponseScript);
 
@@ -327,6 +328,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
                 using var responseEngine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Debug, $"User Script log: {o}")))
+                    .SetValue("request", request)
                     .SetValue("response", responseDto)
                     .Execute(queryParametersTestConnection.ProcessResponseScript);
 
@@ -375,7 +377,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 {
                     var key = en.Current.Key;
                     key = SanitizeVocabularyKey(key); //TODO Maybe the key can be sanitized in the end of ExecuteSearch(), but the Dictionary results need to be updated
-                    metadata.Properties[key] = en.Current.Value.ToString();
+                    metadata.Properties[key] = en.Current.Value?.ToString();
                 }
 
                 if (enrichmentResult.Data.Count > 0)
