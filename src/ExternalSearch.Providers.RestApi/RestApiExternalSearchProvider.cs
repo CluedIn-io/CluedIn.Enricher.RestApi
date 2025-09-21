@@ -109,7 +109,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             queryParameters.Url = ReplaceTokens(queryParameters.Url, queryParameters);
 
-            var request = new RequestDto
+            // keep the original request and make it accessible in process response script
+            var originalRequest = new RequestDto
             {
                 Method = queryParameters.Method,
                 Url = queryParameters.Url,
@@ -120,6 +121,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     Properties = JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty)
                 }
             };
+
+            var request = originalRequest;
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
@@ -162,6 +165,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 using var engine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
                     .SetValue("request", request)
+                    .SetValue("originalRequest", originalRequest)
                     .SetValue("response", responseDto)
                     .Execute(queryParameters.ProcessResponseScript);
 
