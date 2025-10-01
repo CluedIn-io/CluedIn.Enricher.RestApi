@@ -10,7 +10,6 @@ using CluedIn.Core.Providers;
 using CluedIn.Core.Webhooks;
 using CluedIn.ExternalSearch;
 using CluedIn.ExternalSearch.Providers.RestApi;
-//using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using CluedIn.Providers.Models;
 using Constants = CluedIn.ExternalSearch.Providers.RestApi.Constants;
 
@@ -123,11 +122,15 @@ namespace CluedIn.Provider.ExternalSearch.RestApi
         public bool SupportsEnricherV2 => true;
         public Dictionary<string, object> ExtraInfo { get; } = new()
         {
-            { "autoMap", true },
-            { "origin", Constants.ProviderName.ToCamelCase() },
+            { "autoMap", false },
+            { "useEnricherOriginEntityCode", true },
+            { "supportConfidenceScore", true }, // for UI
+            { "minConfidenceScore", 0 }, // for UI
+            { "maxConfidenceScore", 100 }, // for UI
+            { "origin", Constants.ComponentName},
             { "originField", string.Empty },
             { "nameKeyField", string.Empty },
-            //{ "vocabKeyPrefix", GoogleMapsVocabulary.Organization.KeyPrefix},
+            { "vocabKeyPrefix", string.Empty},
             { "autoSubmission", false },
             { "dataSourceSetId", string.Empty },
         };
