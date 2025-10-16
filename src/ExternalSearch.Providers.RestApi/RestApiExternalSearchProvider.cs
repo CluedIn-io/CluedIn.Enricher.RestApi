@@ -92,8 +92,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (requestInfoConfig.TryGetValue("url", out var urlValue) && string.IsNullOrWhiteSpace(urlValue))
             {
-                context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because the Url could not be retrieved");
-                throw new InvalidOperationException("Unable to retrieve Url.");
+                context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because the URL could not be retrieved");
+                throw new InvalidOperationException("Unable to retrieve URL.");
             }
 
             yield return new ExternalSearchQuery(this, entityType, requestInfoConfig);
@@ -137,7 +137,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
 
             if (request == null || string.IsNullOrWhiteSpace(request.Url)) {
-                context.Log.LogTrace($"Skipped enrichment for record {Name} because Url is null or empty");
+                context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
                 yield break; //TODO Log if null
             }
 
@@ -265,7 +265,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Url))
             {
-                return new ConnectionVerificationResult(false, "Url must not be blank");
+                return new ConnectionVerificationResult(false, "URL must not be blank");
             }
 
             if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Method))
@@ -306,7 +306,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
                 if (request == null || string.IsNullOrWhiteSpace(request.Url))
                 {
-                    return new ConnectionVerificationResult(false, $"Url - {request?.Url} is invalid");
+                    return new ConnectionVerificationResult(false, $"URL - {request?.Url} is invalid");
                 }
 
                 var client = new RestClient(request.Url);
