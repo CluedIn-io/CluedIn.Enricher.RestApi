@@ -103,11 +103,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             },
             new()
             {
-                DisplayName = "Url",
+                DisplayName = "URL",
                 Type = "input",
                 IsRequired = true,
                 Name = KeyName.Url,
-                Help = "The endpoint url that will be used for retrieving data."
+                Help = "The endpoint URL that will be used for retrieving data."
             },
             new()
             {
