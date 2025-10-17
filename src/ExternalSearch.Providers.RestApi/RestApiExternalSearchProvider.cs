@@ -136,9 +136,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 request = engine.GetValue("request").ToObject() as RequestDto;
             }
 
-            if (request == null || string.IsNullOrWhiteSpace(request.Url)) {
+            if (request == null)
+            {
+                throw new Exception("Request after Calling User Script is null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Url))
+            {
                 context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
-                yield break; //TODO Log if null
+                throw new Exception("URL after Calling User Script is null or empty.");
             }
 
             var client = new RestClient(request.Url);
@@ -177,7 +183,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
                     context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
-                    yield break;
+                    throw new Exception("Response Content after Calling User Script is null or empty");
                 }
 
                 context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
