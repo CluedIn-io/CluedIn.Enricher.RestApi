@@ -136,7 +136,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             new()
             {
                 DisplayName = "Process Request Script",
-                Type = "multiline",
+                Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
                 Help = "The JavaScript script that will be used to process the request to external source.",
@@ -145,7 +145,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             new()
             {
                 DisplayName = "Process Response Script",
-                Type = "multiline",
+                Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
                 Help = "The JavaScript script that will be used to process the response from external source.",
