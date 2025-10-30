@@ -101,6 +101,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
+            return ActionExtensions.ExecuteWithRetry(
+                () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
+                retryCount: 1000,
+                isTransient: ex => ex.ToString().Contains("TooManyRequests")
+            );
+        }
+
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext context, IExternalSearchQuery query)
+        {
             var queryParameters = GetQueryParameters(query);
 
             if (string.IsNullOrEmpty(queryParameters.Url))
@@ -200,7 +209,6 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
             yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
-
         }
 
         public IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
