@@ -19,7 +19,6 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Web;
 using Castle.MicroKernel.Registration;
 using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using Microsoft.Extensions.Logging;
@@ -221,7 +220,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         .ToDeterministicGuid());
                 var clue = new Clue(code, context.Organization);
 
-                PopulateMetadata(clue.Data.EntityData, resultItem, request);
+                PopulateMetadata(clue.Data.EntityData, resultItem, request, config);
 
                 var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
                 if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
@@ -240,7 +239,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             using (context.Log.BeginScope("{0} {1}: request {2}, result {3}", GetType().Name, "GetPrimaryEntityMetadata",
                        request, result))
             {
-                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request);
+                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request, config);
 
                 context.Log.LogInformation(
                     "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
@@ -368,17 +367,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
         }
 
-        private IEntityMetadata CreateMetadata(IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request)
+        private IEntityMetadata CreateMetadata(IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
             var metadata = new EntityMetadataPart();
 
-            PopulateMetadata(metadata, resultItem, request);
+            PopulateMetadata(metadata, resultItem, request, config);
 
             return metadata;
         }
 
-        private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem,
-            IExternalSearchRequest request)
+        private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
             var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
                 $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
@@ -387,6 +385,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             metadata.Name = request.EntityMetaData.Name;
             metadata.OriginEntityCode = code;
             metadata.Codes.Add(request.EntityMetaData.OriginEntityCode);
+
+            config.TryGetValue(Constants.KeyName.IncludeConfidenceScore, out var includeConfidenceScore);
 
             foreach (var enrichmentResult in resultItem.Data)
             {
@@ -398,7 +398,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     metadata.Properties[key] = en.Current.Value?.ToString();
                 }
 
-                if (enrichmentResult.Data.Count > 0)
+                if (enrichmentResult.Data.Count > 0 && includeConfidenceScore is true)
                 {
                     metadata.Properties[RestApiVocabulary.Organization.ConfidenceScore] = enrichmentResult.Score.ToString(CultureInfo.InvariantCulture);
                 }
