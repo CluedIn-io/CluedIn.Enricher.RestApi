@@ -387,6 +387,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             metadata.Codes.Add(request.EntityMetaData.OriginEntityCode);
 
             config.TryGetValue(Constants.KeyName.IncludeConfidenceScore, out var includeConfidenceScore);
+            config.TryGetValue(ExternalSearchConstants.EnricherV2SendToLandingZone, out var isEnricherV2);
 
             foreach (var enrichmentResult in resultItem.Data)
             {
@@ -398,7 +399,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     metadata.Properties[key] = en.Current.Value?.ToString();
                 }
 
-                if (enrichmentResult.Data.Count > 0 && includeConfidenceScore is true)
+                if (enrichmentResult.Data.Count > 0 && (isEnricherV2 is true ||  includeConfidenceScore is true))
                 {
                     metadata.Properties[RestApiVocabulary.Organization.ConfidenceScore] = enrichmentResult.Score.ToString(CultureInfo.InvariantCulture);
                 }
