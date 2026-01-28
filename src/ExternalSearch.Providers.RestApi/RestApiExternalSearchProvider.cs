@@ -19,8 +19,8 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Web;
 using Castle.MicroKernel.Registration;
+using CluedIn.ExternalSearch.Providers.RestApi.Helper;
 using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -108,13 +108,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             );
         }
 
-        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext context, IExternalSearchQuery query)
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext executionContext, IExternalSearchQuery query)
         {
             var queryParameters = GetQueryParameters(query);
 
             if (string.IsNullOrEmpty(queryParameters.Url))
             {
-                context.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
+                executionContext.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
                     ExternalSearchQueryParameter.Identifier);
             }
 
@@ -134,12 +134,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             };
 
             var request = originalRequest;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
                     .Execute(queryParameters.ProcessRequestScript);
 
                 request = engine.GetValue("request").ToObject() as RequestDto;
@@ -152,7 +156,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (string.IsNullOrWhiteSpace(request.Url))
             {
-                context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
+                executionContext.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
                 throw new Exception("URL after Calling User Script is null or empty.");
             }
 
@@ -167,7 +171,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             restRequest.AddJsonBody(request.Body);
             var restResponse = client.ExecuteAsync(restRequest).Result;
 
-            context.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
+            executionContext.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
 
             var responseDto = new ResponseDto
             {
@@ -180,10 +184,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
+                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
                     .SetValue("request", request)
                     .SetValue("originalRequest", originalRequest)
                     .SetValue("response", responseDto)
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
                     .Execute(queryParameters.ProcessResponseScript);
 
                 var response = engine.GetValue("response").ToObject() as ResponseDto;
@@ -191,11 +197,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
-                    context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
+                    executionContext.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
                     throw new Exception("Response Content after Calling User Script is null or empty");
                 }
 
-                context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
+                executionContext.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
             }
 
             if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString())
@@ -263,7 +269,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             return null;
         }
 
-        public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
+        public ConnectionVerificationResult VerifyConnection(ExecutionContext executionContext, IReadOnlyDictionary<string, object> config)
         {
             var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
             var queryParametersTestConnection = new QueryParameters
@@ -308,11 +314,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     }
                 };
 
+                var stringEncoder = new StringEncodingHelper();
+                var cache = new Cache(executionContext);
+
                 if (!string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessRequestScript))
                 {
                     using var requestEngine = new Jint.Engine()
-                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                        .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                         .SetValue("request", request)
+                        .SetValue("stringEncoder", stringEncoder)
+                        .SetValue("cache", cache)
                         .Execute(queryParametersTestConnection.ProcessRequestScript);
 
                     request = requestEngine.GetValue("request").ToObject() as RequestDto;
@@ -345,9 +356,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("response", responseDto)
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
                     .Execute(queryParametersTestConnection.ProcessResponseScript);
 
                 var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
@@ -733,16 +746,18 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (query.QueryParameters.ContainsKey("processRequestScript"))
             {
-                parameters.ProcessRequestScript = query.QueryParameters.TryGetValue("processRequestScript", out var processRequestScriptValue)
-                    ? processRequestScriptValue.FirstOrDefault()
-                    : string.Empty;
+                parameters.ProcessRequestScript =
+                    query.QueryParameters.TryGetValue("processRequestScript", out var processRequestScriptValue)
+                        ? processRequestScriptValue.FirstOrDefault()
+                        : string.Empty;
             }
 
             if (query.QueryParameters.ContainsKey("processResponseScript"))
             {
-                parameters.ProcessResponseScript = query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
-                    ? processResponseScripValue.FirstOrDefault()
-                    : string.Empty;
+                parameters.ProcessResponseScript =
+                    query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
+                        ? processResponseScripValue.FirstOrDefault()
+                        : string.Empty;
             }
 
             return parameters;
