@@ -30,6 +30,8 @@ public class RequestDto
 
     public void AddHeader(string key, string value)
     {
+        Headers ??= new List<HeaderDto>();
+
         Headers.Add(new HeaderDto
         {
             Key = key,
