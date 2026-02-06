@@ -101,11 +101,67 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
-            return ActionExtensions.ExecuteWithRetry(
-                () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
-                retryCount: 1000,
-                isTransient: ex => ex.ToString().Contains("TooManyRequests")
-            );
+            var versionSelected = query.QueryParameters.TryGetValue("version", out var version)
+                ? version.FirstOrDefault()?.ToLowerInvariant()
+                : string.Empty;
+
+            switch (versionSelected)
+            {
+                // for backward compatibility
+                case null or "" or "v1":
+                    return ActionExtensions.ExecuteWithRetry(
+                        () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
+                        retryCount: 1000,
+                        isTransient: ex => ex.ToString().Contains("TooManyRequests")
+                    );
+                case "v2":
+                    return ActionExtensions.ExecuteWithRetry(
+                        () => InternalExecuteSearchV2(context, query).ToArray(),
+                        retryCount: 1000,
+                        isTransient: ex => ex.ToString().Contains("TooManyRequests")
+                    );
+                default:
+                    throw new Exception("Unable to execute search due to invalid version.");
+            }
+        }
+
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearchV2(ExecutionContext executionContext,
+            IExternalSearchQuery query)
+        {
+            var queryParameters = GetQueryParameters(query);
+            var response = string.Empty;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
+
+            if (!string.IsNullOrWhiteSpace(queryParameters.ProcessScript))
+            {
+                using var engine = new Jint.Engine()
+                    .SetValue("log",
+                        new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
+                    .SetValue("http", new ScriptHttpClient())
+                    .SetValue("retry", new Action<string>(_ =>
+                    {
+                        Thread.Sleep(2000);
+                        throw new Exception("Too many requests.");
+                    })) // To have ability for retry in script
+                    .Execute(queryParameters.ProcessScript);
+
+                response = engine.GetValue("response").ToObject() as string;
+            }
+
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                throw new Exception("Response after Calling User Script is null.");
+            }
+
+            var results = JsonConvert.DeserializeObject<ResultsDto[]>(response);
+
+            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
         }
 
         private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext executionContext, IExternalSearchQuery query)
@@ -184,7 +240,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
                 using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
+                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("originalRequest", originalRequest)
                     .SetValue("response", responseDto)
@@ -204,13 +260,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 executionContext.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
             }
 
-            if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString())
+            if (responseDto.HttpStatus == nameof(HttpStatusCode.TooManyRequests))
             {
                 Thread.Sleep(2000);
                 throw new Exception($"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}"); // hack the message must start with 'Too many requests' for the core to retry
             }
 
-            if (responseDto.HttpStatus != HttpStatusCode.OK.ToString()) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
+            if (responseDto.HttpStatus != nameof(HttpStatusCode.OK)) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
@@ -569,6 +625,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 requestInfoDict.Add("processResponseScript", processResponseScript.ToString());
             }
 
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.ProcessScript, out var processScript) && !string.IsNullOrWhiteSpace(processScript?.ToString()))
+            {
+                requestInfoDict.Add("processScript", processScript.ToString());
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Version, out var version) && !string.IsNullOrWhiteSpace(version?.ToString()))
+            {
+                requestInfoDict.Add("version", version.ToString());
+            }
+
             return requestInfoDict;
         }
 
@@ -706,7 +772,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 ApiKey = string.Empty,
                 Headers = string.Empty,
                 ProcessRequestScript = string.Empty,
-                ProcessResponseScript = string.Empty
+                ProcessResponseScript = string.Empty,
+                ProcessScript = string.Empty
             };
 
             if (query.QueryParameters.ContainsKey("properties"))
@@ -757,6 +824,14 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 parameters.ProcessResponseScript =
                     query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
                         ? processResponseScripValue.FirstOrDefault()
+                        : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("processScript"))
+            {
+                parameters.ProcessScript =
+                    query.QueryParameters.TryGetValue("processScript", out var processScriptValue)
+                        ? processScriptValue.FirstOrDefault()
                         : string.Empty;
             }
 
