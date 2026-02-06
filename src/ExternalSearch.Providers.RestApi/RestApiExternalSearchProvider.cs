@@ -22,6 +22,7 @@ using System.Threading;
 using Castle.MicroKernel.Registration;
 using CluedIn.ExternalSearch.Providers.RestApi.Helper;
 using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
+using Jint;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -105,24 +106,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 ? version.FirstOrDefault()?.ToLowerInvariant()
                 : string.Empty;
 
-            switch (versionSelected)
+            return versionSelected switch
             {
                 // for backward compatibility
-                case null or "" or "v1":
-                    return ActionExtensions.ExecuteWithRetry(
-                        () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
-                        retryCount: 1000,
-                        isTransient: ex => ex.ToString().Contains("TooManyRequests")
-                    );
-                case "v2":
-                    return ActionExtensions.ExecuteWithRetry(
-                        () => InternalExecuteSearchV2(context, query).ToArray(),
-                        retryCount: 1000,
-                        isTransient: ex => ex.ToString().Contains("TooManyRequests")
-                    );
-                default:
-                    throw new Exception("Unable to execute search due to invalid version.");
-            }
+                null or "" or "v1" => ActionExtensions.ExecuteWithRetry(
+                    () => InternalExecuteSearch(context, query)
+                        .ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
+                    retryCount: 1000, isTransient: ex => ex.ToString().Contains("TooManyRequests")),
+                "v2" => ActionExtensions.ExecuteWithRetry(() => InternalExecuteSearchV2(context, query).ToArray(),
+                    retryCount: 1000, isTransient: ex => ex.ToString().Contains("TooManyRequests")),
+                _ => throw new Exception($"Unable to execute search due to invalid version '{versionSelected}'.")
+            };
         }
 
         private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearchV2(ExecutionContext executionContext,
@@ -135,23 +129,28 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessScript))
             {
-                using var engine = new Jint.Engine()
-                    .SetValue("log",
-                        new Action<object>(o =>
-                            executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
+                using var engine = new Jint.Engine(options =>
+                {
+                    options
+                        .LimitRecursion(64)
+                        .MaxStatements(10_000)
+                        .TimeoutInterval(TimeSpan.FromSeconds(2));
+                });
+
+                engine
+                    .SetValue("log", new Action<object>(o =>
+                        executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
                     .SetValue("stringEncoder", stringEncoder)
                     .SetValue("cache", cache)
                     .SetValue("vocabularies",
                         JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
-                    .SetValue("http", new ScriptHttpClient())
-                    .SetValue("retry", new Action<string>(_ =>
-                    {
-                        Thread.Sleep(2000);
-                        throw new Exception("Too many requests.");
-                    })) // To have ability for retry in script
-                    .Execute(queryParameters.ProcessScript);
+                    .SetValue("http", new ScriptHttpClient());
 
-                response = engine.GetValue("response").ToObject() as string;
+                engine.Execute(queryParameters.ProcessScript);
+
+                response = engine.GetValue("response").IsUndefined()
+                    ? string.Empty
+                    : engine.GetValue("response").ToString();
             }
 
             if (string.IsNullOrWhiteSpace(response))
@@ -159,7 +158,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 throw new Exception("Response after Calling User Script is null.");
             }
 
-            var results = JsonConvert.DeserializeObject<ResultsDto[]>(response);
+            ResultsDto[] results;
+            try
+            {
+                results = JsonConvert.DeserializeObject<ResultsDto[]>(response);
+            }
+            catch (JsonException ex)
+            {
+                throw new Exception("Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure.", ex);
+            }
 
             yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
         }
@@ -195,8 +202,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
-                using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    })
+                    .SetValue("log",
+                        new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("stringEncoder", stringEncoder)
                     .SetValue("cache", cache)
@@ -239,8 +254,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
-                using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    })
+                    .SetValue("log",
+                        new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("originalRequest", originalRequest)
                     .SetValue("response", responseDto)
@@ -248,7 +271,10 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .SetValue("cache", cache)
                     .Execute(queryParameters.ProcessResponseScript);
 
-                var response = engine.GetValue("response").ToObject() as ResponseDto;
+                var response = engine.GetValue("response").IsUndefined()
+                    ? null
+                    : engine.GetValue("response").ToObject() as ResponseDto;
+
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
 
                 if (string.IsNullOrWhiteSpace(responseDto.Content))

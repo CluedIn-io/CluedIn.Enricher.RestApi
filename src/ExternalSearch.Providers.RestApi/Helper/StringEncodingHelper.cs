@@ -25,7 +25,7 @@ public class StringEncodingHelper
         }
         catch (FormatException)
         {
-            throw new ArgumentNullException(nameof(base64), "Base64 value is in an incorrect format");
+            throw new ArgumentException("Base64 value is in an incorrect format", nameof(base64));
         }
     }
 
