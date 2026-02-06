@@ -8,7 +8,7 @@ public class StringEncodingHelper
     public string ToBase64(string value)
     {
         if (value == null)
-            throw new ArgumentNullException(nameof(value), "Value to be converted to base64 cannot be empty.");
+            throw new ArgumentNullException(nameof(value), "Value to be converted to base64 cannot be null.");
 
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
     }

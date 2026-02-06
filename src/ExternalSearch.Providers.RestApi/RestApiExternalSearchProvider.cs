@@ -215,6 +215,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .SetValue("request", request)
                     .SetValue("stringEncoder", stringEncoder)
                     .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
                     .Execute(queryParameters.ProcessRequestScript);
 
                 request = engine.GetValue("request").ToObject() as RequestDto;
@@ -269,6 +271,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .SetValue("response", responseDto)
                     .SetValue("stringEncoder", stringEncoder)
                     .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
                     .Execute(queryParameters.ProcessResponseScript);
 
                 var response = engine.GetValue("response").IsUndefined()

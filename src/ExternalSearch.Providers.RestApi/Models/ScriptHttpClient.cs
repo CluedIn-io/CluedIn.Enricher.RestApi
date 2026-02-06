@@ -11,7 +11,7 @@ public class ScriptHttpClient
 {
     private static readonly HttpClient Client = new()
     {
-        Timeout = TimeSpan.FromSeconds(10)
+        Timeout = TimeSpan.FromSeconds(60)
     };
 
     /// <summary>
@@ -60,7 +60,7 @@ public class ScriptHttpClient
             }
         }
 
-        if (method.Equals(HttpMethod.Post.Method, StringComparison.OrdinalIgnoreCase)
+        if (!method.Equals(HttpMethod.Get.Method, StringComparison.OrdinalIgnoreCase)
             && requestDto.Body != null)
         {
             var json = JsonConvert.SerializeObject(requestDto.Body);
