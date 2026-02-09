@@ -129,6 +129,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessScript))
             {
+                var processScript = ReplaceTokens(queryParameters.ProcessScript, queryParameters);
                 using var engine = new Jint.Engine(options =>
                 {
                     options
@@ -146,7 +147,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
                     .SetValue("http", new ScriptHttpClient());
 
-                engine.Execute(queryParameters.ProcessScript);
+                engine.Execute(processScript);
 
                 response = engine.GetValue("response").IsUndefined()
                     ? string.Empty
@@ -202,6 +203,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
+                var processRequestScript = ReplaceTokens(queryParameters.ProcessRequestScript, queryParameters);
                 using var engine = new Jint.Engine(options =>
                     {
                         options
@@ -217,7 +219,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .SetValue("cache", cache)
                     .SetValue("vocabularies",
                         JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
-                    .Execute(queryParameters.ProcessRequestScript);
+                    .Execute(processRequestScript);
 
                 request = engine.GetValue("request").ToObject() as RequestDto;
             }
@@ -375,6 +377,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             var response = string.Empty;
             var stringEncoder = new StringEncodingHelper();
             var cache = new Cache(executionContext);
+            var queryParametersTestConnection = new QueryParameters
+            {
+                Body = data.VocabularyAndProperties,
+                ApiKey = data.ApiKey,
+                Headers = data.Headers,
+                ProcessScript = data.ProcessScript
+            };
 
             try
             {
@@ -382,6 +391,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
                 if (!string.IsNullOrWhiteSpace(data.ProcessScript))
                 {
+                    var processScript = ReplaceTokens(data.ProcessScript, queryParametersTestConnection);
                     using var engine = new Jint.Engine(options =>
                     {
                         options
@@ -398,7 +408,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         .SetValue("vocabularies", body)
                         .SetValue("http", new ScriptHttpClient());
 
-                    engine.Execute(data.ProcessScript);
+                    engine.Execute(processScript);
 
                     response = engine.GetValue("response").IsUndefined()
                         ? string.Empty
@@ -438,31 +448,31 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 ProcessResponseScript = data.ProcessResponseScript
             };
 
-            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Url))
+            if (string.IsNullOrWhiteSpace(data.Url))
             {
                 return new ConnectionVerificationResult(false, "URL must not be blank");
             }
 
-            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Method))
+            if (string.IsNullOrWhiteSpace(data.Method))
             {
                 return new ConnectionVerificationResult(false, "Method must not be blank");
             }
 
-            if (queryParametersTestConnection.Url.Contains("Vocabulary:"))
+            if (data.Url.Contains("Vocabulary:"))
             {
                 return new ConnectionVerificationResult(false, "Please replace {Vocabulary:xxx} in url with actual value to test connection");
             }
 
             try
             {
-                var body = string.IsNullOrWhiteSpace(queryParametersTestConnection.Body) ? null : GetPropertiesTestConnection(queryParametersTestConnection.Body);
-                var url = ReplaceTokens(queryParametersTestConnection.Url, queryParametersTestConnection);
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
+                var url = ReplaceTokens(data.Url, queryParametersTestConnection);
                 var request = new RequestDto
                 {
-                    Method = queryParametersTestConnection.Method,
+                    Method = data.Method,
                     Url = url,
                     Headers = GetHeaders(queryParametersTestConnection),
-                    ApiKey = queryParametersTestConnection.ApiKey,
+                    ApiKey = data.ApiKey,
                     Body = new BodyDto
                     {
                         Properties = body
@@ -472,14 +482,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 var stringEncoder = new StringEncodingHelper();
                 var cache = new Cache(executionContext);
 
-                if (!string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessRequestScript))
+                if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
                 {
+                    var processRequest = ReplaceTokens(data.ProcessRequestScript, queryParametersTestConnection);
                     using var requestEngine = new Jint.Engine()
                         .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                         .SetValue("request", request)
                         .SetValue("stringEncoder", stringEncoder)
                         .SetValue("cache", cache)
-                        .Execute(queryParametersTestConnection.ProcessRequestScript);
+                        .Execute(processRequest);
 
                     request = requestEngine.GetValue("request").ToObject() as RequestDto;
                 }
@@ -508,7 +519,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
                 };
 
-                if (string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessResponseScript)) return new ConnectionVerificationResult(true);
+                if (string.IsNullOrWhiteSpace(data.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
                     .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
@@ -516,7 +527,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .SetValue("response", responseDto)
                     .SetValue("stringEncoder", stringEncoder)
                     .SetValue("cache", cache)
-                    .Execute(queryParametersTestConnection.ProcessResponseScript);
+                    .Execute(data.ProcessResponseScript);
 
                 var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
