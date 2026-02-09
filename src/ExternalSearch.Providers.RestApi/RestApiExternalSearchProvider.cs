@@ -358,6 +358,75 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public ConnectionVerificationResult VerifyConnection(ExecutionContext executionContext, IReadOnlyDictionary<string, object> config)
         {
             var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
+
+            return data.Version switch
+            {
+                // for backward compatibility
+                null or "" or "v1" => VerifyConnectionV1(executionContext, data),
+                "v2" => VerifyConnectionV2(executionContext, data),
+                _ => new ConnectionVerificationResult(false, $"Unable to verify connection due to invalid version '{data.Version}'.")
+
+            };
+        }
+
+        private static ConnectionVerificationResult VerifyConnectionV2(ExecutionContext executionContext,
+            RestApiExternalSearchJobData data)
+        {
+            var response = string.Empty;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
+
+            try
+            {
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
+
+                if (!string.IsNullOrWhiteSpace(data.ProcessScript))
+                {
+                    using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    });
+
+                    engine
+                        .SetValue("log", new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
+                        .SetValue("stringEncoder", stringEncoder)
+                        .SetValue("cache", cache)
+                        .SetValue("vocabularies", body)
+                        .SetValue("http", new ScriptHttpClient());
+
+                    engine.Execute(data.ProcessScript);
+
+                    response = engine.GetValue("response").IsUndefined()
+                        ? string.Empty
+                        : engine.GetValue("response").ToString();
+                }
+
+                if (string.IsNullOrWhiteSpace(response))
+                {
+                    return new ConnectionVerificationResult(false, "Response Content after Calling User Script is null or empty");
+                }
+
+                JsonConvert.DeserializeObject<ResultsDto[]>(response);
+            }
+            catch (JsonException)
+            {
+                return new ConnectionVerificationResult(false, "Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure");
+            }
+            catch (Exception ex)
+            {
+                return new ConnectionVerificationResult(false, ex.Message);
+            }
+
+            return new ConnectionVerificationResult(true);
+        }
+
+        private static ConnectionVerificationResult VerifyConnectionV1(ExecutionContext executionContext,
+            RestApiExternalSearchJobData data)
+        {
             var queryParametersTestConnection = new QueryParameters
             {
                 Url = data.Url,
@@ -457,12 +526,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     return new ConnectionVerificationResult(false, "Response Content after Calling User Script is null or empty");
                 }
 
-                if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString()) return new ConnectionVerificationResult(false, $"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
+                if (responseDto.HttpStatus == nameof(HttpStatusCode.TooManyRequests)) return new ConnectionVerificationResult(false, $"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
-                return responseDto.HttpStatus != HttpStatusCode.OK.ToString() ? new ConnectionVerificationResult(false, $"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}") : new ConnectionVerificationResult(true);
+                return responseDto.HttpStatus != nameof(HttpStatusCode.OK) ? new ConnectionVerificationResult(false, $"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}") : new ConnectionVerificationResult(true);
             }
-            catch (Exception ex) 
-            { 
+            catch (Exception ex)
+            {
                 return new ConnectionVerificationResult(false, ex.Message);
             }
         }
