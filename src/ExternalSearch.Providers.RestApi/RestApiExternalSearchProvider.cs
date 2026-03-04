@@ -191,7 +191,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
                     context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
-                    throw new Exception("Response Content after Calling User Script is null or empty");
+                    // Temporarily comment it out; it’s causing log overflow
+                    //throw new Exception("Response Content after Calling User Script is null or empty");
                 }
 
                 context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
