@@ -146,13 +146,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (request == null)
             {
-                throw new Exception("Request after Calling User Script is null.");
+                context.Log.LogWarning($"Request after Calling User Script is null");
+                // Temporarily comment the exceptions out; it’s causing log overflow
+                //throw new Exception("Request after Calling User Script is null.");
+                yield break;
             }
 
             if (string.IsNullOrWhiteSpace(request.Url))
             {
                 context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
-                throw new Exception("URL after Calling User Script is null or empty.");
+                //throw new Exception("URL after Calling User Script is null or empty.");
+                yield break;
             }
 
             var client = new RestClient(request.Url);
@@ -186,12 +190,19 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .Execute(queryParameters.ProcessResponseScript);
 
                 var response = engine.GetValue("response").ToObject() as ResponseDto;
-                responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
+
+                if (response == null)
+                {
+                    yield break;
+                }
+
+                responseDto = response;
 
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
                     context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
-                    throw new Exception("Response Content after Calling User Script is null or empty");
+                    //throw new Exception("Response Content after Calling User Script is null or empty");
+                    yield break;
                 }
 
                 context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
