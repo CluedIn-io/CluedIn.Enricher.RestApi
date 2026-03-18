@@ -19,7 +19,6 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Web;
 using Castle.MicroKernel.Registration;
 using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
 using Microsoft.Extensions.Logging;
@@ -92,14 +91,23 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (requestInfoConfig.TryGetValue("url", out var urlValue) && string.IsNullOrWhiteSpace(urlValue))
             {
-                context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because the Url could not be retrieved");
-                throw new InvalidOperationException("Unable to retrieve Url.");
+                context.Log.LogTrace($"Skipped enrichment for record {request.EntityMetaData.OriginEntityCode} because the URL could not be retrieved");
+                throw new InvalidOperationException("Unable to retrieve URL.");
             }
 
             yield return new ExternalSearchQuery(this, entityType, requestInfoConfig);
         }
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
+        {
+            return ActionExtensions.ExecuteWithRetry(
+                () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
+                retryCount: 1000,
+                isTransient: ex => ex.ToString().Contains("TooManyRequests")
+            );
+        }
+
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext context, IExternalSearchQuery query)
         {
             var queryParameters = GetQueryParameters(query);
 
@@ -136,9 +144,19 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 request = engine.GetValue("request").ToObject() as RequestDto;
             }
 
-            if (request == null || string.IsNullOrWhiteSpace(request.Url)) {
-                context.Log.LogTrace($"Skipped enrichment for record {Name} because Url is null or empty");
-                yield break; //TODO Log if null
+            if (request == null)
+            {
+                context.Log.LogWarning($"Request after Calling User Script is null");
+                // Temporarily comment the exceptions out; it’s causing log overflow
+                //throw new Exception("Request after Calling User Script is null.");
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Url))
+            {
+                context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
+                //throw new Exception("URL after Calling User Script is null or empty.");
+                yield break;
             }
 
             var client = new RestClient(request.Url);
@@ -172,11 +190,18 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     .Execute(queryParameters.ProcessResponseScript);
 
                 var response = engine.GetValue("response").ToObject() as ResponseDto;
-                responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
+
+                if (response == null)
+                {
+                    yield break;
+                }
+
+                responseDto = response;
 
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
                     context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
+                    //throw new Exception("Response Content after Calling User Script is null or empty");
                     yield break;
                 }
 
@@ -194,7 +219,6 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
             yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
-
         }
 
         public IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
@@ -207,7 +231,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         .ToDeterministicGuid());
                 var clue = new Clue(code, context.Organization);
 
-                PopulateMetadata(clue.Data.EntityData, resultItem, request);
+                PopulateMetadata(clue.Data.EntityData, resultItem, request, config);
 
                 var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
                 if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
@@ -226,7 +250,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             using (context.Log.BeginScope("{0} {1}: request {2}, result {3}", GetType().Name, "GetPrimaryEntityMetadata",
                        request, result))
             {
-                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request);
+                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request, config);
 
                 context.Log.LogInformation(
                     "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
@@ -265,7 +289,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Url))
             {
-                return new ConnectionVerificationResult(false, "Url must not be blank");
+                return new ConnectionVerificationResult(false, "URL must not be blank");
             }
 
             if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Method))
@@ -306,7 +330,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
                 if (request == null || string.IsNullOrWhiteSpace(request.Url))
                 {
-                    return new ConnectionVerificationResult(false, $"Url - {request?.Url} is invalid");
+                    return new ConnectionVerificationResult(false, $"URL - {request?.Url} is invalid");
                 }
 
                 var client = new RestClient(request.Url);
@@ -354,17 +378,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
         }
 
-        private IEntityMetadata CreateMetadata(IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request)
+        private IEntityMetadata CreateMetadata(IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
             var metadata = new EntityMetadataPart();
 
-            PopulateMetadata(metadata, resultItem, request);
+            PopulateMetadata(metadata, resultItem, request, config);
 
             return metadata;
         }
 
-        private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem,
-            IExternalSearchRequest request)
+        private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
             var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
                 $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
@@ -373,6 +396,9 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             metadata.Name = request.EntityMetaData.Name;
             metadata.OriginEntityCode = code;
             metadata.Codes.Add(request.EntityMetaData.OriginEntityCode);
+
+            config.TryGetValue(Constants.KeyName.IncludeConfidenceScore, out var includeConfidenceScore);
+            config.TryGetValue(ExternalSearchConstants.EnricherV2SendToLandingZone, out var isEnricherV2);
 
             foreach (var enrichmentResult in resultItem.Data)
             {
@@ -384,7 +410,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     metadata.Properties[key] = en.Current.Value?.ToString();
                 }
 
-                if (enrichmentResult.Data.Count > 0)
+                if (enrichmentResult.Data.Count > 0 && (isEnricherV2 is true ||  includeConfidenceScore is true))
                 {
                     metadata.Properties[RestApiVocabulary.Organization.ConfidenceScore] = enrichmentResult.Score.ToString(CultureInfo.InvariantCulture);
                 }

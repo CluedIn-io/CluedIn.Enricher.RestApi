@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using CluedIn.Core.Data.Relational;
+using CluedIn.Core.ExternalSearch;
 using CluedIn.Core.Providers;
 
 namespace CluedIn.ExternalSearch.Providers.RestApi
@@ -48,6 +49,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public struct KeyName
         {
             public const string AcceptedEntityType = "acceptedEntityType";
+            public const string IncludeConfidenceScore = "includeConfidenceScore";
             public const string Method = "method";
             public const string Url = "url";
             public const string ApiKey = "apiKey";
@@ -103,11 +105,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             },
             new()
             {
-                DisplayName = "Url",
+                DisplayName = "URL",
                 Type = "input",
                 IsRequired = true,
                 Name = KeyName.Url,
-                Help = "The endpoint url that will be used for retrieving data."
+                Help = "The endpoint URL that will be used for retrieving data."
             },
             new()
             {
@@ -136,7 +138,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             new()
             {
                 DisplayName = "Process Request Script",
-                Type = "multiline",
+                Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
                 Help = "The JavaScript script that will be used to process the request to external source.",
@@ -145,11 +147,29 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             new()
             {
                 DisplayName = "Process Response Script",
-                Type = "multiline",
+                Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
                 Help = "The JavaScript script that will be used to process the response from external source.",
                 Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}}
+            },
+            new()
+            {
+                DisplayName = "Include Confidence Score",
+                Type = "checkbox",
+                IsRequired = false,
+                Name = KeyName.IncludeConfidenceScore,
+                Help = "When enabled, the results will include a confidence score, which can be used during data processing.",
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = ExternalSearchConstants.EnricherV2SendToLandingZone,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "true",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    },
+                ]
             },
         };
 
