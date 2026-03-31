@@ -31,7 +31,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 { Constants.KeyName.ApiKey, ApiKey },
                 { Constants.KeyName.ProcessRequestScript, ProcessRequestScript },
                 { Constants.KeyName.ProcessResponseScript, ProcessResponseScript },
-                { Constants.KeyName.IncludeConfidenceScore, IncludeConfidenceScore }
+                { Constants.KeyName.IncludeConfidenceScore, IncludeConfidenceScore },
                 { Constants.KeyName.ProcessScript, ProcessScript },
                 { Constants.KeyName.Version, Version}
             };
