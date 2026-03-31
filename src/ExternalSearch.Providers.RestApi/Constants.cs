@@ -55,11 +55,18 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             public const string VocabularyAndProperties = "vocabularyAndProperties";
             public const string ProcessRequestScript = "processRequestScript";
             public const string ProcessResponseScript = "processResponseScript";
+            public const string ProcessScript = "processScript";
+            public const string Version = "version";
         }
 
         public static string About { get; set; } = "The REST API Enricher retrieves data resources from a wide variety of endpoints, offering flexible and seamless access to diverse data sources.";
         public static string Icon { get; set; } = "Resources.RestApi.svg";
         public static string Domain { get; set; } = "N/A";
+
+        public const string Get = "GET";
+        public const string Post = "POST";
+        public const string V1 = "V1";
+        public const string V2 = "V2";
 
         private static readonly HashSet<string> SupportedMethodsHashSet = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -67,10 +74,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             Post,
         };
 
-        public const string Get = "GET";
-        public const string Post = "POST";
+
+        private static readonly HashSet<string> SupportedVersionsHashSet = new(StringComparer.OrdinalIgnoreCase)
+        {
+            V1,
+            V2
+        };
 
         public static ICollection<string> SupportedMethods => SupportedMethodsHashSet;
+        public static ICollection<string> SupportedVersions => SupportedVersionsHashSet;
 
         public static IEnumerable<Control> Properties { get; set; } = new List<Control>
         {
@@ -81,6 +93,20 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 IsRequired = true,
                 Name = KeyName.AcceptedEntityType,
                 Help = "The business domain that defines the golden records you want to enrich (e.g., /Organization)."
+            },
+            new()
+            {
+                DisplayName = "Version",
+                Type = "option",
+                IsRequired = true,
+                Name = KeyName.Version,
+                Help = "The version of REST API enricher. When set to V1, Process Request Script and Process Response Script will be used. When set to V2, only a single Process Script will be used.",
+                SourceType = ControlSourceType.Dynamic,
+                Source = RestApiExtendedConfigurationProvider.SourceName,
+                Options = new Dictionary<string, object>
+                {
+                    { "defaultValue", "v2" }
+                }
             },
             new()
             {
@@ -98,6 +124,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         Name = KeyName.Url,
                         Operator = ControlDependencyOperator.Exists,
                         UnfulfilledAction = ControlDependencyUnfulfilledAction.None,
+                    },
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
                     }
                 ],
             },
@@ -107,7 +140,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "input",
                 IsRequired = true,
                 Name = KeyName.Url,
-                Help = "The endpoint URL that will be used for retrieving data."
+                Help = "The endpoint URL that will be used for retrieving data.",
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    }
+                ],
             },
             new()
             {
@@ -115,7 +158,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "password",
                 IsRequired = false,
                 Name = KeyName.ApiKey,
-                Help = "The authorization api key for the endpoint that will be used for retrieving data."
+                Help = "The authorization api key for the endpoint that will be used for retrieving data.",
             },
             new()
             {
@@ -123,7 +166,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "multiline",
                 IsRequired = false,
                 Name = KeyName.Headers,
-                Help = "The headers for the endpoint that will be used for retrieving data."
+                Help = "The headers for the endpoint that will be used for retrieving data.",
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    }
+                ],
             },
             new()
             {
@@ -140,7 +193,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
                 Help = "The JavaScript script that will be used to process the request to external source.",
-                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}}
+                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    }
+                ],
             },
             new()
             {
@@ -149,7 +212,36 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
                 Help = "The JavaScript script that will be used to process the response from external source.",
-                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}}
+                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    }
+                ],
+            },
+            new()
+            {
+                DisplayName = "Process Script",
+                Type = "scriptEditor",
+                IsRequired = false,
+                Name = KeyName.ProcessScript,
+                Help = "The JavaScript script that will be used to request and process the response from external source.",
+                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = KeyName.Version,
+                        Operator = ControlDependencyOperator.Equals,
+                        Value = "v2",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    },
+                ],
             },
         };
 

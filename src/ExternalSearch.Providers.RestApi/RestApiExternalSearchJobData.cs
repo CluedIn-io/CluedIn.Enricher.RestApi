@@ -15,6 +15,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             Headers = GetValue<string>(configuration, Constants.KeyName.Headers);
             ProcessRequestScript = GetValue<string>(configuration, Constants.KeyName.ProcessRequestScript);
             ProcessResponseScript = GetValue<string>(configuration, Constants.KeyName.ProcessResponseScript);
+            ProcessScript = GetValue<string>(configuration, Constants.KeyName.ProcessScript);
+            Version = GetValue<string>(configuration, Constants.KeyName.Version);
         }
 
         public IDictionary<string, object> ToDictionary()
@@ -28,6 +30,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 { Constants.KeyName.ApiKey, ApiKey },
                 { Constants.KeyName.ProcessRequestScript, ProcessRequestScript },
                 { Constants.KeyName.ProcessResponseScript, ProcessResponseScript },
+                { Constants.KeyName.ProcessScript, ProcessScript },
+                { Constants.KeyName.Version, Version}
             };
         }
 
@@ -39,5 +43,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public string Headers { get; set; }
         public string ProcessRequestScript { get; set; }
         public string ProcessResponseScript { get; set; }
+        public string ProcessScript { get; set; }
+        public string Version { get; set; }
     }
 }

@@ -16,6 +16,10 @@ internal class RestApiExtendedConfigurationProvider : IExtendedConfigurationProv
         .Select(name => new Option(name.ToLowerInvariant(), name))
         .ToArray();
 
+    private static readonly Option[] VersionOptions = Constants.SupportedVersions
+        .Select(name => new Option(name.ToLowerInvariant(), name))
+        .ToArray();
+
     public Task<CanHandleResponse> CanHandle(ExecutionContext context, ExtendedConfigurationRequest request)
     {
         return Task.FromResult(new CanHandleResponse
@@ -29,6 +33,7 @@ internal class RestApiExtendedConfigurationProvider : IExtendedConfigurationProv
         var found = request.Key switch
         {
             Constants.KeyName.Method => HandleMethods().Data.SingleOrDefault(item => item.Value.Equals(request.Value, StringComparison.OrdinalIgnoreCase)),
+            Constants.KeyName.Version => HandleVersions().Data.SingleOrDefault(item => item.Value.Equals(request.Value, StringComparison.OrdinalIgnoreCase)),
             _ => null,
         };
 
@@ -46,8 +51,21 @@ internal class RestApiExtendedConfigurationProvider : IExtendedConfigurationProv
         return Task.FromResult(request.Key switch
         {
             Constants.KeyName.Method => HandleMethods(),
+            Constants.KeyName.Version => HandleVersions(),
+
             _ => ResolveOptionsResponse.Empty,
         });
+    }
+
+    private static ResolveOptionsResponse HandleVersions()
+    {
+        return new ResolveOptionsResponse
+        {
+            Data = VersionOptions,
+            Total = VersionOptions.Length,
+            Page = 0,
+            Take = DefaultPageSize,
+        };
     }
 
     private static ResolveOptionsResponse HandleMethods()

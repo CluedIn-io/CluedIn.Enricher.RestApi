@@ -9,5 +9,6 @@ public class QueryParameters
     public string Headers { get; set; }
     public string ProcessRequestScript { get; set; }
     public string ProcessResponseScript { get; set; }
+    public string ProcessScript { get; set; }
 }
 
