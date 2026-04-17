@@ -74,22 +74,32 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         };
 
         public static ICollection<string> SupportedMethods => SupportedMethodsHashSet;
-        public static readonly Dictionary<string, VersionInfo> SupportedVersions =
-            new(StringComparer.OrdinalIgnoreCase)
+
+        private static Dictionary<string, VersionInfo> CreateSupportedVersions()
+        {
+            var supportedVersions = new Dictionary<string, VersionInfo>(StringComparer.OrdinalIgnoreCase)
             {
                 ["V1"] = new VersionInfo
                 {
-                    Value = "V1",
                     Label = "V1 (legacy)",
                     Description = "Separate request and response scripts for existing setups"
                 },
                 ["V2"] = new VersionInfo
                 {
-                    Value = "V2",
                     Label = "V2 (recommended)",
                     Description = "Single script handling both request and response"
                 }
             };
+
+            foreach (var version in supportedVersions)
+            {
+                version.Value.Value = version.Key;
+            }
+
+            return supportedVersions;
+        }
+
+        public static readonly Dictionary<string, VersionInfo> SupportedVersions = CreateSupportedVersions();
 
         public static IEnumerable<Control> Properties { get; set; } = new List<Control>
         {
