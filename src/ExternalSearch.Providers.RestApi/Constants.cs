@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CluedIn.Core.Data.Relational;
 using CluedIn.Core.Providers;
+using CluedIn.ExternalSearch.Providers.RestApi.Models;
 
 namespace CluedIn.ExternalSearch.Providers.RestApi
 {
@@ -65,8 +66,6 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public const string Get = "GET";
         public const string Post = "POST";
-        public const string V1 = "V1";
-        public const string V2 = "V2";
 
         private static readonly HashSet<string> SupportedMethodsHashSet = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -74,15 +73,23 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             Post,
         };
 
-
-        private static readonly HashSet<string> SupportedVersionsHashSet = new(StringComparer.OrdinalIgnoreCase)
-        {
-            V1,
-            V2
-        };
-
         public static ICollection<string> SupportedMethods => SupportedMethodsHashSet;
-        public static ICollection<string> SupportedVersions => SupportedVersionsHashSet;
+        public static readonly Dictionary<string, VersionInfo> SupportedVersions =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["V1"] = new VersionInfo
+                {
+                    Value = "V1",
+                    Label = "V1 (legacy)",
+                    Description = "Separate request and response scripts for existing setups"
+                },
+                ["V2"] = new VersionInfo
+                {
+                    Value = "V2",
+                    Label = "V2 (recommended)",
+                    Description = "Single script handling both request and response"
+                }
+            };
 
         public static IEnumerable<Control> Properties { get; set; } = new List<Control>
         {
@@ -105,7 +112,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Source = RestApiExtendedConfigurationProvider.SourceName,
                 Options = new Dictionary<string, object>
                 {
-                    { "defaultValue", "v2" }
+                    { "defaultValue", "v2" },
+                    { "alerts", new Dictionary<string, Dictionary<string, AlertConfig>>
+                        {
+                            {  KeyName.Version, new Dictionary<string, AlertConfig>
+                                {
+                                    { "v1", new AlertConfig { Icon = "Info", Message = "This enricher uses V1 (legacy version)." } }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             new()
