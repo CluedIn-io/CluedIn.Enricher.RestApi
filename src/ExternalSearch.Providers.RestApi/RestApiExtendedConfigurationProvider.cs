@@ -16,11 +16,11 @@ internal class RestApiExtendedConfigurationProvider : IExtendedConfigurationProv
         .Select(name => new Option(name.ToLowerInvariant(), name))
         .ToArray();
 
-    private static readonly Option[] VersionOptions = Constants.SupportedVersions
-        .Select(name => new Option(
-            name.Value.Value.ToLowerInvariant(),
-            name.Value.Label,  
-            Description: name.Value.Description
+    private static readonly Option[] VersionOptions = Constants.SupportedVersions.Values
+        .Select(version => new Option(
+            version.Value.ToLowerInvariant(),
+            version.Label,
+            Description: version.Description
         )).ToArray();
 
     public Task<CanHandleResponse> CanHandle(ExecutionContext context, ExtendedConfigurationRequest request)
