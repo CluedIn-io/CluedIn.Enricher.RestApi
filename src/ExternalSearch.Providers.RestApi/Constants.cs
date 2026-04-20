@@ -218,8 +218,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessRequestScript,
-                Help = "The JavaScript script that will be used to process the request to external source.",
-                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                Help = "The JavaScript script used to process the request to an external source.",
+                Options = new Dictionary<string, object>() {{"scriptingLanguage", "JavaScript"}},
                 DisplayDependencies =
                 [
                     new ControlDisplayDependency
@@ -237,8 +237,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessResponseScript,
-                Help = "The JavaScript script that will be used to process the response from external source.",
-                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                Help = "The JavaScript script used to process responses from an external source.",
+                Options = new Dictionary<string, object>() {{"scriptingLanguage", "JavaScript"}},
                 DisplayDependencies =
                 [
                     new ControlDisplayDependency
@@ -256,8 +256,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 Type = "scriptEditor",
                 IsRequired = false,
                 Name = KeyName.ProcessScript,
-                Help = "The JavaScript script that will be used to request and process the response from external source.",
-                Options = new Dictionary<string, object>() {{"Scripting Language", "JavaScript"}},
+                Help = "The JavaScript script for requesting and processing data from an external source.",
+                Options = new Dictionary<string, object>() {{"scriptingLanguage", "JavaScript"}},
                 DisplayDependencies =
                 [
                     new ControlDisplayDependency
