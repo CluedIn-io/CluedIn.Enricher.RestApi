@@ -52,9 +52,18 @@ public class ScriptHttpClient
 
         using var message = new HttpRequestMessage(new HttpMethod(method), uri);
 
+        var contentType = "application/json";
         if (requestDto.Headers != null)
         {
-            foreach (var header in requestDto.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
+            // Find Content-Type header if present
+            var contentTypeHeader = requestDto.Headers.FirstOrDefault(h => string.Equals(h.Key, "Content-Type", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(contentTypeHeader?.Value))
+            {
+                contentType = contentTypeHeader.Value;
+            }
+            
+            // Add all headers except Content-Type to message.Headers
+            foreach (var header in requestDto.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase)))
             {
                 message.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
@@ -63,8 +72,21 @@ public class ScriptHttpClient
         if (!method.Equals(HttpMethod.Get.Method, StringComparison.OrdinalIgnoreCase)
             && requestDto.Body != null)
         {
-            var json = JsonConvert.SerializeObject(requestDto.Body);
-            message.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            string contentString;
+            if (string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                contentString = JsonConvert.SerializeObject(requestDto.Body);
+            }
+            else if (requestDto.Body is string strBody)
+            {
+                contentString = strBody;
+            }
+            else
+            {
+                // Fallback: serialize as JSON if not a string
+                contentString = JsonConvert.SerializeObject(requestDto.Body);
+            }
+            message.Content = new StringContent(contentString, Encoding.UTF8, contentType);
         }
 
         try
@@ -77,7 +99,7 @@ public class ScriptHttpClient
             {
                 HttpStatus = response.StatusCode.ToString(),
                 Content = content,
-                ContentType = response.Content?.Headers.ContentType?.ToString(),
+                ContentType = response.Content.Headers.ContentType?.ToString(),
                 Headers = response.Headers
                     .Select(h => new HeaderDto
                     {
