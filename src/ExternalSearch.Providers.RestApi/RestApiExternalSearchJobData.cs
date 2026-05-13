@@ -15,6 +15,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             Headers = GetValue<string>(configuration, Constants.KeyName.Headers);
             ProcessRequestScript = GetValue<string>(configuration, Constants.KeyName.ProcessRequestScript);
             ProcessResponseScript = GetValue<string>(configuration, Constants.KeyName.ProcessResponseScript);
+            IncludeConfidenceScore = GetValue<bool>(configuration, Constants.KeyName.IncludeConfidenceScore);
             ProcessScript = GetValue<string>(configuration, Constants.KeyName.ProcessScript);
             Version = GetValue<string>(configuration, Constants.KeyName.Version);
         }
@@ -30,6 +31,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 { Constants.KeyName.ApiKey, ApiKey },
                 { Constants.KeyName.ProcessRequestScript, ProcessRequestScript },
                 { Constants.KeyName.ProcessResponseScript, ProcessResponseScript },
+                { Constants.KeyName.IncludeConfidenceScore, IncludeConfidenceScore },
                 { Constants.KeyName.ProcessScript, ProcessScript },
                 { Constants.KeyName.Version, Version}
             };
@@ -43,6 +45,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public string Headers { get; set; }
         public string ProcessRequestScript { get; set; }
         public string ProcessResponseScript { get; set; }
+        public bool IncludeConfidenceScore { get; set; }
         public string ProcessScript { get; set; }
         public string Version { get; set; }
     }
