@@ -156,7 +156,9 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (string.IsNullOrWhiteSpace(response))
             {
-                throw new Exception("Response after Calling User Script is null.");
+                executionContext.Log.LogWarning("Request after Calling User Script is null");
+                //throw new Exception("Response after Calling User Script is null.");
+                yield break;
             }
 
             ResultsDto[] results;
@@ -166,7 +168,9 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
             catch (JsonException ex)
             {
-                throw new Exception("Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure.", ex);
+                executionContext.Log.LogWarning($"Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure. {ex}");
+                //throw new Exception("Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure.", ex);
+                yield break;
             }
 
             yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
@@ -226,13 +230,17 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (request == null)
             {
-                throw new Exception("Request after Calling User Script is null.");
+                executionContext.Log.LogWarning("Request after Calling User Script is null");
+                // Temporarily comment the exceptions out; it’s causing log overflow
+                //throw new Exception("Request after Calling User Script is null.");
+                yield break;
             }
 
             if (string.IsNullOrWhiteSpace(request.Url))
             {
                 executionContext.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
-                throw new Exception("URL after Calling User Script is null or empty.");
+                //throw new Exception("URL after Calling User Script is null or empty.");
+                yield break;
             }
 
             var client = new RestClient(request.Url);
@@ -281,12 +289,18 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     ? null
                     : engine.GetValue("response").ToObject() as ResponseDto;
 
-                responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
+                if (response == null)
+                {
+                    yield break;
+                }
 
+                responseDto = response;
+                
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
                     executionContext.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
-                    throw new Exception("Response Content after Calling User Script is null or empty");
+                    //throw new Exception("Response Content after Calling User Script is null or empty");
+                    yield break;
                 }
 
                 executionContext.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
