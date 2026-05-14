@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using CluedIn.Core.Data.Relational;
+using CluedIn.Core.ExternalSearch;
 using CluedIn.Core.Providers;
 using CluedIn.ExternalSearch.Providers.RestApi.Models;
 
@@ -49,6 +50,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
         public struct KeyName
         {
             public const string AcceptedEntityType = "acceptedEntityType";
+            public const string IncludeConfidenceScore = "includeConfidenceScore";
             public const string Method = "method";
             public const string Url = "url";
             public const string ApiKey = "apiKey";
@@ -268,6 +270,24 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
                     },
                 ],
+            },
+            new()
+            {
+                DisplayName = "Include Confidence Score",
+                Type = "checkbox",
+                IsRequired = false,
+                Name = KeyName.IncludeConfidenceScore,
+                Help = "When enabled, the results will include a confidence score, which can be used during data processing.",
+                DisplayDependencies =
+                [
+                    new ControlDisplayDependency
+                    {
+                        Name = ExternalSearchConstants.EnricherV2SendToLandingZone,
+                        Operator = ControlDependencyOperator.NotEquals,
+                        Value = "true",
+                        UnfulfilledAction = ControlDependencyUnfulfilledAction.Hidden,
+                    },
+                ]
             },
         };
 
