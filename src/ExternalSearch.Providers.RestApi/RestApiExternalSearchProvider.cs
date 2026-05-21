@@ -572,9 +572,10 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
+            var queryKey = request.Queries.FirstOrDefault(x => x.Id == resultItem.QueryId)?.QueryKey ?? request.Queries.FirstOrDefault()?.QueryKey;
             var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
-                $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
-                    .ToDeterministicGuid());
+                $"{queryKey}{request.EntityMetaData.OriginEntityCode}".ToDeterministicGuid());
+
             metadata.EntityType = request.EntityMetaData.EntityType;
             metadata.Name = request.EntityMetaData.Name;
             metadata.OriginEntityCode = code;
