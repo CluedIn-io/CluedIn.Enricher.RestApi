@@ -36,5 +36,6 @@
     <PackageReference Update="CluedIn.ExternalSearch" Version="$(_CluedIn)" />
     <PackageReference Update="CluedIn.Rules" Version="$(_CluedIn)" />
     <PackageReference Update="jint" Version="4.2.2" />
+    <PackageReference Update="IgnoresAccessChecksToGenerator" Version="0.8.0" />
   </ItemGroup>
 </Project>
