@@ -1,4 +1,6 @@
+using CluedIn.Core.Threading;
 using System;
+using Microsoft.Extensions.Logging;
 using ExecutionContext = CluedIn.Core.ExecutionContext;
 
 namespace CluedIn.ExternalSearch.Providers.RestApi.Helper;
@@ -29,5 +31,56 @@ public class Cache(ExecutionContext executionContext)
         }
 
         executionContext.ApplicationContext.System.Cache.SetItem(keyWithOrgId, value, expiration > 0 ? DateTimeOffset.Now.AddMilliseconds(expiration) : null);
+    }
+
+    public object GetOrSetValue(string key, object value, double expiration)
+    {
+        return GetOrSetInternal(key, () => value, expiration);
+    }
+
+    public object GetOrSetFactory(string key, Func<object> factory, double expiration)
+    {
+        return GetOrSetInternal(key, factory, expiration);
+    }
+
+    private object GetOrSetInternal(
+        string key,
+        Func<object> factory,
+        double expiration)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        var cached = Get(key);
+        if (cached != null)
+        {
+            return cached;
+        }
+
+        var keyWithOrgId = $"{executionContext.Organization.Id}_{key}";
+        try
+        {
+            using var scope = executionContext.ApplicationContext.System.Locks.CreateLockingScope();
+            using var applicationLock = scope.GetClusterWideExclusiveLock($"RestApiEnricher_Cache_Lock_{keyWithOrgId}", TimeSpan.FromSeconds(30));
+
+            cached = Get(key);
+            if (cached != null)
+            {
+                return cached;
+            }
+
+            var value = factory();
+
+            Set(key, value, expiration);
+
+            return value;
+        }
+        catch (ApplicationLockProviderException ex)
+        {
+            executionContext.Log.LogWarning(ex, "[Enricher] Lock Exception Getting REST API enricher cache {Key}", key);
+            return null;
+        }
     }
 }
