@@ -20,7 +20,9 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Castle.MicroKernel.Registration;
+using CluedIn.ExternalSearch.Providers.RestApi.Helper;
 using CluedIn.ExternalSearch.Providers.RestApi.Vocabularies;
+using Jint;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -100,20 +102,87 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public IEnumerable<IExternalSearchQueryResult> ExecuteSearch(ExecutionContext context, IExternalSearchQuery query, IDictionary<string, object> config, IProvider provider)
         {
-            return ActionExtensions.ExecuteWithRetry(
-                () => InternalExecuteSearch(context, query).ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
-                retryCount: 1000,
-                isTransient: ex => ex.ToString().Contains("TooManyRequests")
-            );
+            var versionSelected = query.QueryParameters.TryGetValue("version", out var version)
+                ? version.FirstOrDefault()?.ToLowerInvariant()
+                : string.Empty;
+
+            return versionSelected switch
+            {
+                // for backward compatibility
+                null or "" or "v1" => ActionExtensions.ExecuteWithRetry(
+                    () => InternalExecuteSearch(context, query)
+                        .ToArray(), // important we need to materialize the enumerable for ExecuteWithRetry to work
+                    retryCount: 1000, isTransient: ex => ex.ToString().Contains("TooManyRequests")),
+                "v2" => ActionExtensions.ExecuteWithRetry(() => InternalExecuteSearchV2(context, query).ToArray(),
+                    retryCount: 1000, isTransient: ex => ex.ToString().Contains("TooManyRequests")),
+                _ => throw new Exception($"Unable to execute search due to invalid version '{versionSelected}'.")
+            };
         }
 
-        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext context, IExternalSearchQuery query)
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearchV2(ExecutionContext executionContext,
+            IExternalSearchQuery query)
+        {
+            var queryParameters = GetQueryParameters(query);
+            var response = string.Empty;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
+
+            if (!string.IsNullOrWhiteSpace(queryParameters.ProcessScript))
+            {
+                var processScript = ReplaceTokens(queryParameters.ProcessScript, queryParameters);
+                using var engine = new Jint.Engine(options =>
+                {
+                    options
+                        .LimitRecursion(64)
+                        .MaxStatements(10_000)
+                        .TimeoutInterval(TimeSpan.FromSeconds(2));
+                });
+
+                engine
+                    .SetValue("log", new Action<object>(o =>
+                        executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
+                    .SetValue("http", new ScriptHttpClient());
+
+                engine.Execute(processScript);
+
+                response = engine.GetValue("response").IsUndefined()
+                    ? string.Empty
+                    : engine.GetValue("response").ToString();
+            }
+
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                executionContext.Log.LogWarning("Request after Calling User Script is null");
+                //throw new Exception("Response after Calling User Script is null.");
+                yield break;
+            }
+
+            ResultsDto[] results;
+            try
+            {
+                results = JsonConvert.DeserializeObject<ResultsDto[]>(response);
+            }
+            catch (JsonException ex)
+            {
+                executionContext.Log.LogWarning($"Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure. {ex}");
+                //throw new Exception("Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure.", ex);
+                yield break;
+            }
+
+            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
+        }
+
+        private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext executionContext, IExternalSearchQuery query)
         {
             var queryParameters = GetQueryParameters(query);
 
             if (string.IsNullOrEmpty(queryParameters.Url))
             {
-                context.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
+                executionContext.Log.LogTrace("No parameter for '{Identifier}' in query, skipping execute search",
                     ExternalSearchQueryParameter.Identifier);
             }
 
@@ -133,20 +202,35 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             };
 
             var request = originalRequest;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessRequestScript))
             {
-                using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                var processRequestScript = ReplaceTokens(queryParameters.ProcessRequestScript, queryParameters);
+                using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    })
+                    .SetValue("log",
+                        new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
-                    .Execute(queryParameters.ProcessRequestScript);
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
+                    .Execute(processRequestScript);
 
                 request = engine.GetValue("request").ToObject() as RequestDto;
             }
 
             if (request == null)
             {
-                context.Log.LogWarning($"Request after Calling User Script is null");
+                executionContext.Log.LogWarning("Request after Calling User Script is null");
                 // Temporarily comment the exceptions out; it’s causing log overflow
                 //throw new Exception("Request after Calling User Script is null.");
                 yield break;
@@ -154,7 +238,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (string.IsNullOrWhiteSpace(request.Url))
             {
-                context.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
+                executionContext.Log.LogTrace($"Skipped enrichment for record {Name} because URL is null or empty");
                 //throw new Exception("URL after Calling User Script is null or empty.");
                 yield break;
             }
@@ -170,7 +254,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             restRequest.AddJsonBody(request.Body);
             var restResponse = client.ExecuteAsync(restRequest).Result;
 
-            context.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
+            executionContext.Log.Log(LogLevel.Debug, $"{Name} - {restResponse.StatusCode} - {restResponse.Content}");
 
             var responseDto = new ResponseDto
             {
@@ -182,14 +266,28 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (!string.IsNullOrWhiteSpace(queryParameters.ProcessResponseScript))
             {
-                using var engine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}" )))
+                using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    })
+                    .SetValue("log",
+                        new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("originalRequest", originalRequest)
                     .SetValue("response", responseDto)
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
+                    .SetValue("vocabularies",
+                        JsonConvert.DeserializeObject<List<PropertyDto>>(queryParameters.Body ?? string.Empty))
                     .Execute(queryParameters.ProcessResponseScript);
 
-                var response = engine.GetValue("response").ToObject() as ResponseDto;
+                var response = engine.GetValue("response").IsUndefined()
+                    ? null
+                    : engine.GetValue("response").ToObject() as ResponseDto;
 
                 if (response == null)
                 {
@@ -197,24 +295,24 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 }
 
                 responseDto = response;
-
+                
                 if (string.IsNullOrWhiteSpace(responseDto.Content))
                 {
-                    context.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
+                    executionContext.Log.LogWarning($"{Name} - Response Content after Calling User Script is null or empty");
                     //throw new Exception("Response Content after Calling User Script is null or empty");
                     yield break;
                 }
 
-                context.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
+                executionContext.Log.Log(LogLevel.Debug, $"{Name} - Response after Calling User Script\n{JsonConvert.SerializeObject(response)}");
             }
 
-            if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString())
+            if (responseDto.HttpStatus == nameof(HttpStatusCode.TooManyRequests))
             {
                 Thread.Sleep(2000);
                 throw new Exception($"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}"); // hack the message must start with 'Too many requests' for the core to retry
             }
 
-            if (responseDto.HttpStatus != HttpStatusCode.OK.ToString()) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
+            if (responseDto.HttpStatus != nameof(HttpStatusCode.OK)) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
@@ -232,7 +330,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 var clue = new Clue(code, context.Organization);
 
                 PopulateMetadata(clue.Data.EntityData, resultItem, request, config);
-
+                
                 var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
                 if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
                     this.DownloadPreviewImage(context, property, clue);
@@ -251,7 +349,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                        request, result))
             {
                 var metadata = CreateMetadata(result.As<ResultsDto[]>(), request, config);
-
+                
                 context.Log.LogInformation(
                     "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
                     metadata.Name, metadata.OriginEntityCode.Origin.Code);
@@ -273,9 +371,86 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             return null;
         }
 
-        public ConnectionVerificationResult VerifyConnection(ExecutionContext context, IReadOnlyDictionary<string, object> config)
+        public ConnectionVerificationResult VerifyConnection(ExecutionContext executionContext, IReadOnlyDictionary<string, object> config)
         {
             var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
+
+            return data.Version switch
+            {
+                // for backward compatibility
+                null or "" or "v1" => VerifyConnectionV1(executionContext, data),
+                "v2" => VerifyConnectionV2(executionContext, data),
+                _ => new ConnectionVerificationResult(false, $"Unable to verify connection due to invalid version '{data.Version}'.")
+
+            };
+        }
+
+        private static ConnectionVerificationResult VerifyConnectionV2(ExecutionContext executionContext,
+            RestApiExternalSearchJobData data)
+        {
+            var response = string.Empty;
+            var stringEncoder = new StringEncodingHelper();
+            var cache = new Cache(executionContext);
+            var queryParametersTestConnection = new QueryParameters
+            {
+                Body = data.VocabularyAndProperties,
+                ApiKey = data.ApiKey,
+                Headers = data.Headers,
+                ProcessScript = data.ProcessScript
+            };
+
+            try
+            {
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
+
+                if (!string.IsNullOrWhiteSpace(data.ProcessScript))
+                {
+                    var processScript = ReplaceTokens(data.ProcessScript, queryParametersTestConnection);
+                    using var engine = new Jint.Engine(options =>
+                    {
+                        options
+                            .LimitRecursion(64)
+                            .MaxStatements(10_000)
+                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                    });
+
+                    engine
+                        .SetValue("log", new Action<object>(o =>
+                            executionContext.Log.Log(LogLevel.Information, "User Script log: {O}", o)))
+                        .SetValue("stringEncoder", stringEncoder)
+                        .SetValue("cache", cache)
+                        .SetValue("vocabularies", body)
+                        .SetValue("http", new ScriptHttpClient());
+
+                    engine.Execute(processScript);
+
+                    response = engine.GetValue("response").IsUndefined()
+                        ? string.Empty
+                        : engine.GetValue("response").ToString();
+                }
+
+                if (string.IsNullOrWhiteSpace(response))
+                {
+                    return new ConnectionVerificationResult(false, "Response Content after Calling User Script is null or empty");
+                }
+
+                JsonConvert.DeserializeObject<ResultsDto[]>(response);
+            }
+            catch (JsonException)
+            {
+                return new ConnectionVerificationResult(false, "Failed to deserialize user script response to ResultsDto[]. Ensure the script returns valid JSON matching the expected structure");
+            }
+            catch (Exception ex)
+            {
+                return new ConnectionVerificationResult(false, ex.Message);
+            }
+
+            return new ConnectionVerificationResult(true);
+        }
+
+        private static ConnectionVerificationResult VerifyConnectionV1(ExecutionContext executionContext,
+            RestApiExternalSearchJobData data)
+        {
             var queryParametersTestConnection = new QueryParameters
             {
                 Url = data.Url,
@@ -287,43 +462,49 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 ProcessResponseScript = data.ProcessResponseScript
             };
 
-            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Url))
+            if (string.IsNullOrWhiteSpace(data.Url))
             {
                 return new ConnectionVerificationResult(false, "URL must not be blank");
             }
 
-            if (string.IsNullOrWhiteSpace(queryParametersTestConnection.Method))
+            if (string.IsNullOrWhiteSpace(data.Method))
             {
                 return new ConnectionVerificationResult(false, "Method must not be blank");
             }
 
-            if (queryParametersTestConnection.Url.Contains("Vocabulary:"))
+            if (data.Url.Contains("Vocabulary:"))
             {
                 return new ConnectionVerificationResult(false, "Please replace {Vocabulary:xxx} in url with actual value to test connection");
             }
 
             try
             {
-                var body = string.IsNullOrWhiteSpace(queryParametersTestConnection.Body) ? null : GetPropertiesTestConnection(queryParametersTestConnection.Body);
-                var url = ReplaceTokens(queryParametersTestConnection.Url, queryParametersTestConnection);
+                var body = string.IsNullOrWhiteSpace(data.VocabularyAndProperties) ? null : GetPropertiesTestConnection(data.VocabularyAndProperties);
+                var url = ReplaceTokens(data.Url, queryParametersTestConnection);
                 var request = new RequestDto
                 {
-                    Method = queryParametersTestConnection.Method,
+                    Method = data.Method,
                     Url = url,
                     Headers = GetHeaders(queryParametersTestConnection),
-                    ApiKey = queryParametersTestConnection.ApiKey,
+                    ApiKey = data.ApiKey,
                     Body = new BodyDto
                     {
                         Properties = body
                     }
                 };
 
-                if (!string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessRequestScript))
+                var stringEncoder = new StringEncodingHelper();
+                var cache = new Cache(executionContext);
+
+                if (!string.IsNullOrWhiteSpace(data.ProcessRequestScript))
                 {
+                    var processRequest = ReplaceTokens(data.ProcessRequestScript, queryParametersTestConnection);
                     using var requestEngine = new Jint.Engine()
-                        .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                        .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                         .SetValue("request", request)
-                        .Execute(queryParametersTestConnection.ProcessRequestScript);
+                        .SetValue("stringEncoder", stringEncoder)
+                        .SetValue("cache", cache)
+                        .Execute(processRequest);
 
                     request = requestEngine.GetValue("request").ToObject() as RequestDto;
                 }
@@ -352,13 +533,15 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     Headers = restResponse.Headers.Select(x => new HeaderDto { Key = x.Name, Value = x.Value?.ToString() }).ToList()
                 };
 
-                if (string.IsNullOrWhiteSpace(queryParametersTestConnection.ProcessResponseScript)) return new ConnectionVerificationResult(true);
+                if (string.IsNullOrWhiteSpace(data.ProcessResponseScript)) return new ConnectionVerificationResult(true);
 
                 using var responseEngine = new Jint.Engine()
-                    .SetValue("log", new Action<object>(o => context.Log.Log(LogLevel.Information, $"User Script log: {o}")))
+                    .SetValue("log", new Action<object>(o => executionContext.Log.Log(LogLevel.Information, $"User Script log: {o}")))
                     .SetValue("request", request)
                     .SetValue("response", responseDto)
-                    .Execute(queryParametersTestConnection.ProcessResponseScript);
+                    .SetValue("stringEncoder", stringEncoder)
+                    .SetValue("cache", cache)
+                    .Execute(data.ProcessResponseScript);
 
                 var response = responseEngine.GetValue("response").ToObject() as ResponseDto;
                 responseDto = response ?? throw new ApplicationException("Response after Calling User Script is null");
@@ -368,12 +551,12 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     return new ConnectionVerificationResult(false, "Response Content after Calling User Script is null or empty");
                 }
 
-                if (responseDto.HttpStatus == HttpStatusCode.TooManyRequests.ToString()) return new ConnectionVerificationResult(false, $"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
+                if (responseDto.HttpStatus == nameof(HttpStatusCode.TooManyRequests)) return new ConnectionVerificationResult(false, $"Too many requests - Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
-                return responseDto.HttpStatus != HttpStatusCode.OK.ToString() ? new ConnectionVerificationResult(false, $"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}") : new ConnectionVerificationResult(true);
+                return responseDto.HttpStatus != nameof(HttpStatusCode.OK) ? new ConnectionVerificationResult(false, $"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}") : new ConnectionVerificationResult(true);
             }
-            catch (Exception ex) 
-            { 
+            catch (Exception ex)
+            {
                 return new ConnectionVerificationResult(false, ex.Message);
             }
         }
@@ -389,9 +572,10 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         private void PopulateMetadata(IEntityMetadata metadata, IExternalSearchQueryResult<ResultsDto[]> resultItem, IExternalSearchRequest request, IDictionary<string, object> config)
         {
+            var queryKey = request.Queries.FirstOrDefault(x => x.Id == resultItem.QueryId)?.QueryKey ?? request.Queries.FirstOrDefault()?.QueryKey;
             var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
-                $"{request.Queries.FirstOrDefault()?.QueryKey}{request.EntityMetaData.OriginEntityCode}"
-                    .ToDeterministicGuid());
+                $"{queryKey}{request.EntityMetaData.OriginEntityCode}".ToDeterministicGuid());
+
             metadata.EntityType = request.EntityMetaData.EntityType;
             metadata.Name = request.EntityMetaData.Name;
             metadata.OriginEntityCode = code;
@@ -410,7 +594,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     metadata.Properties[key] = en.Current.Value?.ToString();
                 }
 
-                if (enrichmentResult.Data.Count > 0 && (isEnricherV2 is true ||  includeConfidenceScore is true))
+                if (enrichmentResult.Data.Count > 0 && (isEnricherV2 is true || includeConfidenceScore is true))
                 {
                     metadata.Properties[RestApiVocabulary.Organization.ConfidenceScore] = enrichmentResult.Score.ToString(CultureInfo.InvariantCulture);
                 }
@@ -568,6 +752,16 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 requestInfoDict.Add("processResponseScript", processResponseScript.ToString());
             }
 
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.ProcessScript, out var processScript) && !string.IsNullOrWhiteSpace(processScript?.ToString()))
+            {
+                requestInfoDict.Add("processScript", processScript.ToString());
+            }
+
+            if (configMap != null && configMap.TryGetValue(Constants.KeyName.Version, out var version) && !string.IsNullOrWhiteSpace(version?.ToString()))
+            {
+                requestInfoDict.Add("version", version.ToString());
+            }
+
             return requestInfoDict;
         }
 
@@ -705,7 +899,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 ApiKey = string.Empty,
                 Headers = string.Empty,
                 ProcessRequestScript = string.Empty,
-                ProcessResponseScript = string.Empty
+                ProcessResponseScript = string.Empty,
+                ProcessScript = string.Empty
             };
 
             if (query.QueryParameters.ContainsKey("properties"))
@@ -745,16 +940,26 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             if (query.QueryParameters.ContainsKey("processRequestScript"))
             {
-                parameters.ProcessRequestScript = query.QueryParameters.TryGetValue("processRequestScript", out var processRequestScriptValue)
-                    ? processRequestScriptValue.FirstOrDefault()
-                    : string.Empty;
+                parameters.ProcessRequestScript =
+                    query.QueryParameters.TryGetValue("processRequestScript", out var processRequestScriptValue)
+                        ? processRequestScriptValue.FirstOrDefault()
+                        : string.Empty;
             }
 
             if (query.QueryParameters.ContainsKey("processResponseScript"))
             {
-                parameters.ProcessResponseScript = query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
-                    ? processResponseScripValue.FirstOrDefault()
-                    : string.Empty;
+                parameters.ProcessResponseScript =
+                    query.QueryParameters.TryGetValue("processResponseScript", out var processResponseScripValue)
+                        ? processResponseScripValue.FirstOrDefault()
+                        : string.Empty;
+            }
+
+            if (query.QueryParameters.ContainsKey("processScript"))
+            {
+                parameters.ProcessScript =
+                    query.QueryParameters.TryGetValue("processScript", out var processScriptValue)
+                        ? processScriptValue.FirstOrDefault()
+                        : string.Empty;
             }
 
             return parameters;

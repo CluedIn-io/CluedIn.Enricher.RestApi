@@ -27,6 +27,17 @@ public class RequestDto
     /// The body content of the HTTP request.
     /// </summary>
     public object Body { get; set; }
+
+    public void AddHeader(string key, string value)
+    {
+        Headers ??= new List<HeaderDto>();
+
+        Headers.Add(new HeaderDto
+        {
+            Key = key,
+            Value = value
+        });
+    }
 }
 
 /// <summary>
