@@ -244,7 +244,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
 
             var client = new RestClient(request.Url);
-            var restRequest = new RestRequest(GetHttpMethod(request.Method));
+            var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
             foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
             {
@@ -350,6 +350,73 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             {
                 var metadata = CreateMetadata(result.As<ResultsDto[]>(), request, config);
                 
+                context.Log.LogInformation(
+                    "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
+                    metadata.Name, metadata.OriginEntityCode.Origin.Code);
+
+                return metadata;
+            }
+        }
+
+
+        public IPreviewImage GetPrimaryEntityPreviewImage(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
+        {
+            var metadata = GetPrimaryEntityMetadata(context, result, request, config, provider);
+            var logoKey = metadata.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+            if (!string.IsNullOrEmpty(logoKey) && metadata.Properties.TryGetValue(logoKey, out var value))
+            {
+                return DownloadPreviewImageBlob(context, value);
+            }
+
+            return null;
+        }
+
+        public ConnectionVerificationResult VerifyConnection(ExecutionContext executionContext, IReadOnlyDictionary<string, object> config)
+        {
+            var data = new RestApiExternalSearchJobData(config.ToDictionary(x => x.Key, x => x.Value));
+
+            return data.Version switch
+            {
+                // for backward compatibility
+                null or "" or "v1" => VerifyConnectionV1(executionContext, data),
+                "v2" => VerifyConnectionV2(executionContext, data),
+                _ => new ConnectionVerificationResult(false, $"Unable to verify connection due to invalid version '{data.Version}'.")
+
+            };
+        }
+
+        private static ConnectionVerificationResult VerifyConnectionV2(ExecutionContext executionContext,
+            RestApiExternalSearchJobData data)
+        {
+            using (context.Log.BeginScope("{0} {1}: query {2}, request {3}, result {4}", GetType().Name, "BuildClues", query, request, result))
+            {
+                var resultItem = result.As<ResultsDto[]>();
+                var code = new EntityCode(request.EntityMetaData.EntityType, "RestApi",
+                    $"{query.QueryKey}{request.EntityMetaData.OriginEntityCode}"
+                        .ToDeterministicGuid());
+                var clue = new Clue(code, context.Organization);
+
+                PopulateMetadata(clue.Data.EntityData, resultItem, request, config);
+
+                var logoKey = clue.Data.EntityData.Properties?.Keys.FirstOrDefault(key => key.Contains(".logo"));
+                if (!string.IsNullOrEmpty(logoKey) && clue.Data.EntityData.Properties.TryGetValue(logoKey, out var property))
+                    this.DownloadPreviewImage(context, property, clue);
+
+                context.Log.LogInformation(
+                    "Clue produced, Id: '{Id}' OriginEntityCode: '{OriginEntityCode}' RawText: '{RawText}'", clue.Id,
+                    clue.OriginEntityCode, clue.RawText);
+
+                return [clue];
+            }
+        }
+
+        public IEntityMetadata GetPrimaryEntityMetadata(ExecutionContext context, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
+        {
+            using (context.Log.BeginScope("{0} {1}: request {2}, result {3}", GetType().Name, "GetPrimaryEntityMetadata",
+                       request, result))
+            {
+                var metadata = CreateMetadata(result.As<ResultsDto[]>(), request, config);
+
                 context.Log.LogInformation(
                     "Primary entity meta data created, Name: '{Name}' OriginEntityCode: '{OriginEntityCode}'",
                     metadata.Name, metadata.OriginEntityCode.Origin.Code);
@@ -515,7 +582,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 }
 
                 var client = new RestClient(request.Url);
-                var restRequest = new RestRequest(GetHttpMethod(request.Method));
+                var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
                 foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value)))
                 {
@@ -882,8 +949,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             return methodString.ToLower() switch
             {
-                "get" => Method.GET,
-                "post" => Method.POST,
+                "get" => Method.Get,
+                "post" => Method.Post,
                 _ => throw new ArgumentException($"Unsupported HTTP method: {methodString}. Expected 'get' or 'post'.",
                     nameof(methodString))
             };
