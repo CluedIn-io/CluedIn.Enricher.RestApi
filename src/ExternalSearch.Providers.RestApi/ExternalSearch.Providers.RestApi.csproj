@@ -13,8 +13,15 @@
 		<PackageReference Include="CluedIn.Crawling" />
 		<PackageReference Include="CluedIn.Core" />
 		<PackageReference Include="CluedIn.Rules" />
+		<PackageReference Include="IgnoresAccessChecksToGenerator">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 	</ItemGroup>
 	<ItemGroup>
 		<InternalsVisibleTo Include="CluedIn.Provider.ExternalSearch.RestApi" />
+	</ItemGroup>
+	<ItemGroup>
+		<IgnoresAccessChecksTo Include="CluedIn.Core" />
 	</ItemGroup>
 </Project>
