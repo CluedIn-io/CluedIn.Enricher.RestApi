@@ -1,17 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<IntermediateOutputPath Condition="'$(IntermediateOutputPath)'==''">obj\$(Configuration)\$(TargetFramework)\</IntermediateOutputPath>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-		<LangVersion>preview</LangVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<LangVersion>preview</LangVersion>
-	</PropertyGroup>
-
-	<ItemGroup>
+    <ItemGroup>
       <None Remove="Resources\RestApi.svg" />
     </ItemGroup>
 

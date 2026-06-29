@@ -244,7 +244,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
 
             var client = new RestClient(request.Url);
-            var restRequest = new RestRequest(GetHttpMethod(request.Method));
+            var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
             foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
             {
@@ -515,7 +515,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 }
 
                 var client = new RestClient(request.Url);
-                var restRequest = new RestRequest(GetHttpMethod(request.Method));
+                var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
                 foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value)))
                 {
