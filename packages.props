@@ -29,4 +29,17 @@
     <PackageReference Update="jint" Version="4.2.2" />
     <PackageReference Update="IgnoresAccessChecksToGenerator" Version="0.8.0" />
   </ItemGroup>
+  <!--
+      CluedIn.Core 4.x's published dependency graph declares System.Configuration.ConfigurationManager
+      and System.Runtime.Caching at two different minimum versions - a direct >= 6.x dependency
+      alongside a transitive >= 8.0.0 one via Microsoft.Data.SqlClient 5.2.2 - which NuGet reports as
+      a downgrade error regardless of this project's own target framework. Referencing them directly
+      at the higher version, exactly what the NU1605 error itself recommends, resolves it. Only
+      needed for 4.x targets (see the matching PackageReference Include in each affected .csproj) -
+      CluedIn.Core 5.x doesn't have this inconsistency.
+  -->
+  <ItemGroup Condition="$(_CluedIn.StartsWith('4.'))">
+    <PackageReference Update="System.Configuration.ConfigurationManager" Version="8.0.0" />
+    <PackageReference Update="System.Runtime.Caching" Version="8.0.0" />
+  </ItemGroup>
 </Project>
