@@ -1,10 +1,5 @@
 name: $(Date:yyyyMMdd)$(Rev:.r)
 parameters:
-  - name: runIntegrationTests
-    displayName: Run Integration Tests
-    type: boolean
-    default: false
-
   - name: pipelineTemplateRef
     displayName: Pipeline Template Ref
     type: string
@@ -28,9 +23,6 @@ resources:
       endpoint: "CluedIn-io"
       ref: ${{ parameters.pipelineTemplateRef }}
 
-pool:
-  vmImage: "windows-latest"
-
 variables:
   - name: testFolderPath
     value: "$(Build.SourcesDirectory)/test"
@@ -41,24 +33,18 @@ variables:
   - name: buildConfiguration
     value: Release
 
-steps:
-  - task: UseDotNet@2
-    displayName: Install .NET SDK 8.0
-    inputs:
-        version: 8.0.x
-
-  - task: NuGetAuthenticate@0
-    displayName: "Authenticate with nuget"
-
-  - template: crawler.build.yml@templates
+# jobs:, not pool:/steps: - crawler.build.jobs.yml (unlike crawler.build.yml) is a jobs template:
+# it builds and tests each multiVersionCluedInTargets entry in its own parallel job instead of
+# sequential steps in one job, so UseDotNet@2/NuGetAuthenticate@0 now live inside the template
+# itself (every job needs its own copy - jobs are isolated agents) rather than being set up once
+# here. Integration tests aren't supported by this template yet.
+jobs:
+  - template: crawler.build.jobs.yml@templates
     parameters:
+      pool:
+        vmImage: "windows-latest"
       githubReleaseInMaster: true
       publicReleaseForMaster: true
-      executeIntegrationTests: ${{ parameters.runIntegrationTests }}
-      createIntegrationEnvironmentScriptFilePath: "./build/integration-test.ps1"
-      createIntegrationEnvironmentScriptArguments: "-Action SetUp"
-      deleteIntegrationEnvironmentScriptFilePath: "./build/integration-test.ps1"
-      deleteIntegrationEnvironmentScriptArguments: "-Action TearDown"
       publishCodeCoverage: true
       useGitVersionDotNetTool: true
       publishToDevFeed: true
