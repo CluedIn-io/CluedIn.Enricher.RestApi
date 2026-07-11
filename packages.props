@@ -41,5 +41,13 @@
   <ItemGroup Condition="$(_CluedIn.StartsWith('4.'))">
     <PackageReference Update="System.Configuration.ConfigurationManager" Version="8.0.0" />
     <PackageReference Update="System.Runtime.Caching" Version="8.0.0" />
+    <!--
+        RestSharp is a transitive dependency (pulled in via CluedIn.Core, never referenced directly
+        here) whose Method enum was renamed from GET/POST to Get/Post in v107 - the code already uses
+        the newer Get/Post names, but CluedIn.Core 4.x's own dependency graph pulls a pre-v107
+        RestSharp. Pinning it directly to a v107+ version, same remedy as above, keeps the existing
+        source code compiling unchanged.
+    -->
+    <PackageReference Update="RestSharp" Version="114.0.0" />
   </ItemGroup>
 </Project>

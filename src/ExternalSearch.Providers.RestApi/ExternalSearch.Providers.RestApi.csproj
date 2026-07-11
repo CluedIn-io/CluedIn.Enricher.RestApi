@@ -28,5 +28,6 @@
 	<ItemGroup Condition="$(_CluedIn.StartsWith('4.'))">
 		<PackageReference Include="System.Configuration.ConfigurationManager" />
 		<PackageReference Include="System.Runtime.Caching" />
+		<PackageReference Include="RestSharp" />
 	</ItemGroup>
 </Project>
