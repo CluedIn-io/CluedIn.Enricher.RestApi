@@ -51,11 +51,16 @@ jobs:
       # Test consumer for the generalized (N-project) multi-version packaging design: unlike
       # CluedIn.Mcp, this repo has two packable projects under src/, so it exercises auto-discovery
       # of packable projects instead of the single-project case. targetFramework is required for
-      # 4.8.0 - this repo's own Directory.Build.props defaults to net10.0 (matching the develop/5.0.0
-      # line it normally builds against), but CluedIn.Core 4.8.0 was published for net6.0.
+      # 4.x - this repo's own Directory.Build.props defaults to net10.0 (matching the develop/5.0.0
+      # line it normally builds against), but CluedIn.Core 4.x was published for net6.0.
       # 5.0.0-alpha.* tests the floating/prerelease cluedInVersion support - 5.0.0 itself hasn't
       # released yet, only prerelease builds exist in the develop feed.
+      # 4.6.0 - the oldest real released version in the 4.6.x line (there's no 4.6.2 package; only
+      # a release/4.6.0 git branch exists) - is a third, older target to further prove out the
+      # generalized N-target design.
       multiVersionCluedInTargets:
+        - cluedInVersion: '4.6.0'
+          targetFramework: 'net6.0'
         - cluedInVersion: '4.8.0'
           targetFramework: 'net6.0'
         - cluedInVersion: '5.0.0-alpha.*'
