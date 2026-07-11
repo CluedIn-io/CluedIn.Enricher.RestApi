@@ -66,4 +66,4 @@ steps:
       # CluedIn.Mcp, this repo has two packable projects under src/, so it exercises auto-discovery
       # of packable projects instead of the single-project case.
       multiVersionCluedInTargets:
-        - cluedInVersion: '5.0.0'
+        - cluedInVersion: '4.8.0'
