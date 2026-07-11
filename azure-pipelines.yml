@@ -64,6 +64,9 @@ steps:
       publishToDevFeed: true
       # Test consumer for the generalized (N-project) multi-version packaging design: unlike
       # CluedIn.Mcp, this repo has two packable projects under src/, so it exercises auto-discovery
-      # of packable projects instead of the single-project case.
+      # of packable projects instead of the single-project case. targetFramework is required here -
+      # this repo's own Directory.Build.props defaults to net10.0 (matching the develop/5.0.0 line
+      # it normally builds against), but CluedIn.Core 4.8.0 was published for net6.0.
       multiVersionCluedInTargets:
         - cluedInVersion: '4.8.0'
+          targetFramework: 'net6.0'
