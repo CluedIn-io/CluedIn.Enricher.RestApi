@@ -3,7 +3,7 @@ parameters:
   - name: pipelineTemplateRef
     displayName: Pipeline Template Ref
     type: string
-    default: refs/heads/feature/option-b-multi-version-packaging
+    default: refs/heads/feature/multi-version-packaging
 
 trigger:
   branches:
