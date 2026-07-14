@@ -24,7 +24,7 @@
 	<ItemGroup>
 		<IgnoresAccessChecksTo Include="CluedIn.Core" />
 	</ItemGroup>
-	<!-- Version pinned centrally in Packages.props, conditional on _CluedIn - see comment there. -->
+	<!-- Version pinned centrally in packages.props, conditional on _CluedIn - see comment there. -->
 	<ItemGroup Condition="$(_CluedIn.StartsWith('4.'))">
 		<PackageReference Include="System.Configuration.ConfigurationManager" />
 		<PackageReference Include="System.Runtime.Caching" />
