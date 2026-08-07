@@ -135,7 +135,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     options
                         .LimitRecursion(64)
                         .MaxStatements(10_000)
-                        .TimeoutInterval(TimeSpan.FromSeconds(2));
+                        .TimeoutInterval(TimeSpan.FromSeconds(120));
                 });
 
                 engine
@@ -214,7 +214,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         options
                             .LimitRecursion(64)
                             .MaxStatements(10_000)
-                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                            .TimeoutInterval(TimeSpan.FromSeconds(120));
                     })
                     .SetValue("log",
                         new Action<object>(o =>
