@@ -173,8 +173,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 yield break;
             }
 
-            foreach (var result in results)
-                yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
+            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
         }
 
         private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext executionContext, IExternalSearchQuery query)
@@ -317,8 +316,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
-            foreach (var result in results)
-                yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
+            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
         }
 
         public IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
