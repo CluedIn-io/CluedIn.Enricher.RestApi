@@ -173,6 +173,9 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 yield break;
             }
 
+            if (results == null)
+                yield break;
+
             foreach (var result in results)
                 yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
         }
@@ -316,6 +319,9 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             if (responseDto.HttpStatus != nameof(HttpStatusCode.OK)) throw new ApplicationException($"Call returned HTTP {responseDto.HttpStatus} - {responseDto.Content}");
 
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
+
+            if (results == null)
+                yield break;
 
             foreach (var result in results)
                 yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
