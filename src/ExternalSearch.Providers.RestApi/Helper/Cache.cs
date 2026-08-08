@@ -83,4 +83,12 @@ public class Cache(ExecutionContext executionContext)
             return null;
         }
     }
+
+    public void Delete(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentNullException(nameof(key), "Cache key cannot be empty.");
+
+        executionContext.ApplicationContext.System.Cache.RemoveItem($"{executionContext.Organization.Id}_{key}");
+    }
 }
