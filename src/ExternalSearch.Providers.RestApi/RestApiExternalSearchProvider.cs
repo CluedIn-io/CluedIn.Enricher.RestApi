@@ -248,7 +248,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
             }
 
             var client = new RestClient(request.Url);
-            var restRequest = new RestRequest(GetHttpMethod(request.Method));
+            var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
             foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key)))
             {
@@ -523,7 +523,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 }
 
                 var client = new RestClient(request.Url);
-                var restRequest = new RestRequest(GetHttpMethod(request.Method));
+                var restRequest = new RestRequest { Method = GetHttpMethod(request.Method) };
 
                 foreach (var header in request.Headers.Where(header => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value)))
                 {
@@ -890,8 +890,8 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             return methodString.ToLower() switch
             {
-                "get" => Method.GET,
-                "post" => Method.POST,
+                "get" => Method.Get,
+                "post" => Method.Post,
                 _ => throw new ArgumentException($"Unsupported HTTP method: {methodString}. Expected 'get' or 'post'.",
                     nameof(methodString))
             };
