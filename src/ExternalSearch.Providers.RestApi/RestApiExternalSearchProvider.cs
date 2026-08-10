@@ -135,7 +135,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                     options
                         .LimitRecursion(64)
                         .MaxStatements(10_000)
-                        .TimeoutInterval(TimeSpan.FromSeconds(2));
+                        .TimeoutInterval(TimeSpan.FromSeconds(120));
                 });
 
                 engine
@@ -173,7 +173,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                 yield break;
             }
 
-            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
+            if (results == null)
+                yield break;
+
+            foreach (var result in results)
+                yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
         }
 
         private IEnumerable<IExternalSearchQueryResult> InternalExecuteSearch(ExecutionContext executionContext, IExternalSearchQuery query)
@@ -213,7 +217,7 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
                         options
                             .LimitRecursion(64)
                             .MaxStatements(10_000)
-                            .TimeoutInterval(TimeSpan.FromSeconds(2));
+                            .TimeoutInterval(TimeSpan.FromSeconds(120));
                     })
                     .SetValue("log",
                         new Action<object>(o =>
@@ -316,7 +320,11 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             var results = JsonConvert.DeserializeObject<ResultsDto[]>(responseDto.Content);
 
-            yield return new ExternalSearchQueryResult<ResultsDto[]>(query, results);
+            if (results == null)
+                yield break;
+
+            foreach (var result in results)
+                yield return new ExternalSearchQueryResult<ResultsDto[]>(query, [result]);
         }
 
         public IEnumerable<Clue> BuildClues(ExecutionContext context, IExternalSearchQuery query, IExternalSearchQueryResult result, IExternalSearchRequest request, IDictionary<string, object> config, IProvider provider)
