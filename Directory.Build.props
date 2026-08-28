@@ -1,6 +1,20 @@
 <Project>
   <PropertyGroup Label="Compilation Metadata">
-    <TargetFramework>net10.0</TargetFramework>
+    <!--
+        CluedInMultiVersionTargetFramework, not a direct -p:TargetFramework= override, so that
+        multi-version builds against older CluedIn.Core releases (which need an older framework -
+        see azure-pipelines.yml) work across ProjectReferences between projects in this repo.
+        MSBuild's ProjectReference protocol undefines the reserved TargetFramework global property
+        when it re-evaluates a referenced project, so a raw -p:TargetFramework= override on the
+        outer project never reaches an inner ProjectReference - a plain project-evaluated property
+        like this one isn't subject to that and propagates normally.
+    -->
+    <TargetFramework Condition="'$(CluedInMultiVersionTargetFramework)' != ''">$(CluedInMultiVersionTargetFramework)</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <!-- Matches this repo's own normal (net10.0) LangVersion even when TargetFramework is forced
+         older for a multi-version build - net6.0's own default LangVersion (10) doesn't support
+         syntax already used in this codebase (raw string literals, primary constructors). -->
+    <LangVersion Condition="'$(LangVersion)' == ''">latest</LangVersion>
   </PropertyGroup>
 
   <!-- TODO: Clean up warnings -->
