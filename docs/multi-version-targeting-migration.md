@@ -132,6 +132,16 @@ Verified directly: `MajorMinorPatch: "1.0.0"`, `SemVer: "1.0.0-multi-version-tar
 
 ---
 
+## Step 8 — Push and confirm CI
+
+Status: **Done**
+
+PR #57, build 151985 — fully green on the **first** push: all three `Multi-version build+test` legs
+(4.7.0, 4.8.0, 5.0.0-beta.*), all three `Integration tests` legs, and `Multi-version: publish` all
+passed.
+
+---
+
 ## Checklist
 
 - [x] `azure-pipelines.yml` — switched to `crawler.build.jobs.yml` with `multiVersionCluedInTargets` (4.7.0, 4.8.0, 5.0.0-beta.*); dead `integration-test.ps1` reference removed
@@ -141,4 +151,4 @@ Verified directly: `MajorMinorPatch: "1.0.0"`, `SemVer: "1.0.0-multi-version-tar
 - [x] Test project — `test/Directory.Build.props` stripped to `IsTestProject`; conditional xunit v2/v3 `ItemGroup`s added to the integration test csproj; verified with real `dotnet test` on both xunit generations
 - [x] Source — one RestSharp 106-vs-114 break fixed (`GetHttpMethod`, `#if CLUEDIN_V50`)
 - [x] `GitVersion.yml` — merged into the pre-existing `ignore:` block (not a second one); `commits-before` padded ~2.5 days past the highest tag; verified `MajorMinorPatch: 1.0.0`
-- [ ] Push branch and confirm the actual Azure DevOps pipeline run is green end-to-end
+- [x] Pushed branch and confirmed the Azure DevOps pipeline is green end-to-end — PR #57, build 151985: all three legs + integration tests + `Multi-version: publish` passed on the first run
