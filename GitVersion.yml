@@ -1,5 +1,10 @@
 mode: ContinuousDeployment
-next-version: 5.0
+# The CluedIn version is now encoded in the published package suffix (e.g. .470/.480/.500), so this
+# repo's own version no longer needs to track CluedIn. Reset to 1.0. next-version alone isn't
+# enough - GitVersion still sees the old 4.x tags in history and treats them as dominant - so
+# ignore.commits-before skips everything up to and past the highest pre-existing tag (4.6.3,
+# 2026-08-10T11:22:51+08:00).
+next-version: 1.0
 branches:
   master:
     mode: ContinuousDelivery
@@ -26,4 +31,5 @@ branches:
     - develop
 ignore:
   sha: []
+  commits-before: 2026-08-13T00:00:00
 

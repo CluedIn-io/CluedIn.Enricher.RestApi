@@ -890,8 +890,13 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
             return methodString.ToLower() switch
             {
+#if CLUEDIN_V50
                 "get" => Method.Get,
                 "post" => Method.Post,
+#else
+                "get" => Method.GET,
+                "post" => Method.POST,
+#endif
                 _ => throw new ArgumentException($"Unsupported HTTP method: {methodString}. Expected 'get' or 'post'.",
                     nameof(methodString))
             };
