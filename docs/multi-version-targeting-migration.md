@@ -152,3 +152,23 @@ passed.
 - [x] Source — one RestSharp 106-vs-114 break fixed (`GetHttpMethod`, `#if CLUEDIN_V50`)
 - [x] `GitVersion.yml` — merged into the pre-existing `ignore:` block (not a second one); `commits-before` padded ~2.5 days past the highest tag; verified `MajorMinorPatch: 1.0.0`
 - [x] Pushed branch and confirmed the Azure DevOps pipeline is green end-to-end — PR #57, build 151985: all three legs + integration tests + `Multi-version: publish` passed on the first run
+
+---
+
+## Addendum — version baseline moved from 1.0.0 to 100.0.0
+
+Status: **Done**
+
+Resetting to `1.0.0` (see the `GitVersion.yml` checklist item above) would have meant this repo's
+own version number appeared to "go backwards" for anyone who'd seen it at `4.x`/`5.x` under the old
+single-version scheme - confusing, since the CluedIn-version targeting is now carried entirely by
+the package suffix (`.470`/`.480`/`.500`), not this number. Moved the baseline to `100.0` instead,
+before any real `1.0.0` stable release ever shipped.
+
+Unlike the original reset, no `commits-before`/`ignore` trick is needed: `next-version` only needs
+help overriding a reachable tag when the new value is *lower* than that tag; `100.0` is already
+higher than every pre-existing tag, so it wins on its own. Verified via a real local
+`dotnet-gitversion` run (pinned tool version 5.9.0): `MajorMinorPatch: "100.0.0"`.
+
+`docs/1.0.0-release-notes.md` renamed to `docs/100.0.0-release-notes.md` to match (this one was
+still just an empty `## Feature` / `## Fixes` stub, so no prose needed updating).
