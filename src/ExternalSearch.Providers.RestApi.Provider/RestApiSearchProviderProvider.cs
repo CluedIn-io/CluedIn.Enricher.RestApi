@@ -133,6 +133,7 @@ namespace CluedIn.Provider.ExternalSearch.RestApi
             { "vocabKeyPrefix", string.Empty},
             { "autoSubmission", false },
             { "dataSourceSetId", string.Empty },
+            { "fieldGroups", Constants.FieldGroups }, // for UI
         };
     }
 }

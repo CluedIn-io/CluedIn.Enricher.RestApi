@@ -103,6 +103,38 @@ namespace CluedIn.ExternalSearch.Providers.RestApi
 
         public static readonly Dictionary<string, VersionInfo> SupportedVersions = CreateSupportedVersions();
 
+        private static Dictionary<string, object> CreateFieldGroup(string id, string label, params string[] fields) => new()
+        {
+            ["id"] = id,
+            ["label"] = label,
+            ["fields"] = fields,
+        };
+
+        /// <summary>
+        /// The sections the UI groups the configuration fields into, in order. Fields no group lists
+        /// (such as the filter and rate limit settings added by CluedIn) go to the last group.
+        /// </summary>
+        public static readonly Dictionary<string, object>[] FieldGroups =
+        [
+            CreateFieldGroup(
+                "connection",
+                "Connection",
+                KeyName.Version,
+                KeyName.Method,
+                KeyName.Url,
+                KeyName.ApiKey,
+                KeyName.Headers),
+            CreateFieldGroup("whatToEnrich", "What to enrich", KeyName.AcceptedEntityType, "enricherRuleCondition"),
+            CreateFieldGroup(
+                "requestAndResponse",
+                "Request and response",
+                KeyName.VocabularyAndProperties,
+                KeyName.ProcessRequestScript,
+                KeyName.ProcessResponseScript,
+                KeyName.ProcessScript),
+            CreateFieldGroup("advanced", "Advanced", KeyName.IncludeConfidenceScore),
+        ];
+
         public static IEnumerable<Control> Properties { get; set; } = new List<Control>
         {
             new()
