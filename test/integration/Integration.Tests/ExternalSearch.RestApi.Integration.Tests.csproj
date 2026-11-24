@@ -19,7 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Sample Process Scripts under docs/samples, run by the tests in Samples/ -->
-    <None Include="..\..\..\docs\samples\vies-vat-validation\vies-process-script.js" Link="Samples\vies-process-script.js" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="..\..\..\docs\samples\vies-vat-validation\vies-process-script.js" Link="Samples\vies-process-script.js" LogicalName="Samples.vies-process-script.js" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.RestApi\ExternalSearch.Providers.RestApi.csproj" />

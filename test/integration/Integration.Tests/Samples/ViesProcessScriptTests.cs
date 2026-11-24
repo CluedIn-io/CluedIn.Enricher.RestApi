@@ -19,8 +19,8 @@ public class ViesProcessScriptTests
 {
     private const string ViesUrl = "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number";
 
-    private static readonly string Script = File.ReadAllText(
-        Path.Combine(AppContext.BaseDirectory, "Samples", "vies-process-script.js"));
+    // Embedded from docs/samples by the test project, so the tests always run the published sample
+    private static readonly string Script = ReadEmbeddedScript("Samples.vies-process-script.js");
 
     [Fact]
     public void ValidNumberWithCountryPrefix_PostsToViesAndReturnsViesProperties()
@@ -233,6 +233,14 @@ public class ViesProcessScriptTests
         engine.Execute(Script);
 
         return engine.GetValue("response").IsUndefined() ? string.Empty : engine.GetValue("response").ToString();
+    }
+
+    private static string ReadEmbeddedScript(string name)
+    {
+        using var stream = typeof(ViesProcessScriptTests).Assembly.GetManifestResourceStream(name)
+                           ?? throw new InvalidOperationException($"Embedded resource '{name}' not found");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     private static List<PropertyDto> Vocabularies(params (string Key, string Value)[] values)
