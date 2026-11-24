@@ -216,7 +216,7 @@ public class ViesProcessScriptTests
     private static string Execute(FakeHttp http, List<PropertyDto> vocabularies, FakeCache cache, TimeSpan timeout)
     {
         // Same engine limits and globals as RestApiExternalSearchProvider.InternalExecuteSearchV2
-        using var engine = new Engine(options =>
+        using var engine = new Jint.Engine(options =>
         {
             options
                 .LimitRecursion(64)
