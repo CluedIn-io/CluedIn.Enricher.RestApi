@@ -18,6 +18,10 @@
     <PackageReference Include="AutoFixture.Xunit2" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Sample Process Scripts under docs/samples, run by the tests in Samples/ -->
+    <None Include="..\..\..\docs\samples\vies-vat-validation\vies-process-script.js" Link="Samples\vies-process-script.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.RestApi\ExternalSearch.Providers.RestApi.csproj" />
   </ItemGroup>
 </Project>
