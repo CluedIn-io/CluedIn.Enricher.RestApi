@@ -20,6 +20,20 @@
   <ItemGroup>
     <!-- Sample Process Scripts under docs/samples, run by the tests in Samples/ -->
     <EmbeddedResource Include="..\..\..\docs\samples\vies-vat-validation\vies-process-script.js" Link="Samples\vies-process-script.js" LogicalName="Samples.vies-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\abn-lookup-australia\abn-process-script.js" Link="Samples\abn-process-script.js" LogicalName="Samples.abn-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\acra-singapore\acra-process-script.js" Link="Samples\acra-process-script.js" LogicalName="Samples.acra-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\brreg-norway\brreg-process-script.js" Link="Samples\brreg-process-script.js" LogicalName="Samples.brreg-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\cnpj-brazil\cnpj-process-script.js" Link="Samples\cnpj-process-script.js" LogicalName="Samples.cnpj-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\companies-registry-hong-kong\hkcr-process-script.js" Link="Samples\hkcr-process-script.js" LogicalName="Samples.hkcr-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\corporations-canada\corporations-canada-process-script.js" Link="Samples\corporations-canada-process-script.js" LogicalName="Samples.corporations-canada-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\e-business-register-estonia\ariregister-process-script.js" Link="Samples\ariregister-process-script.js" LogicalName="Samples.ariregister-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\gbizinfo-japan\gbizinfo-process-script.js" Link="Samples\gbizinfo-process-script.js" LogicalName="Samples.gbizinfo-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\kvk-netherlands\kvk-process-script.js" Link="Samples\kvk-process-script.js" LogicalName="Samples.kvk-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\mca-india\mca-process-script.js" Link="Samples\mca-process-script.js" LogicalName="Samples.mca-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\moea-taiwan\moea-process-script.js" Link="Samples\moea-process-script.js" LogicalName="Samples.moea-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\nzbn-new-zealand\nzbn-process-script.js" Link="Samples\nzbn-process-script.js" LogicalName="Samples.nzbn-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\opendart-south-korea\opendart-process-script.js" Link="Samples\opendart-process-script.js" LogicalName="Samples.opendart-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\ytj-finland\ytj-process-script.js" Link="Samples\ytj-process-script.js" LogicalName="Samples.ytj-process-script.js" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\ExternalSearch.Providers.RestApi\ExternalSearch.Providers.RestApi.csproj" />

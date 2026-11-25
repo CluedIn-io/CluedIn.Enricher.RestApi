@@ -16,7 +16,10 @@ behaviour you have to design around.
    response scripts) exists for older setups. Put the vocabulary keys, URL and cache duration in
    constants at the top so users can change them.
 3. **Add tests** in `test/integration/Integration.Tests/Samples/<Service>ProcessScriptTests.cs`.
-   Copy the pattern in `ViesProcessScriptTests.cs`:
+   Use `SampleScriptRunner` (it already does everything below, including the `{APIKey}`
+   replacement and Test connection's placeholder values and 2-second limit), and copy the pattern
+   in `BrregProcessScriptTests.cs` (no API key) or `KvkProcessScriptTests.cs` (API key).
+   `ViesProcessScriptTests.cs` predates the runner and does the same by hand:
    - Embed the script as a resource in the test project (`<EmbeddedResource ... LogicalName="Samples.<file>.js" />`),
      so the tests always run the published sample.
    - Create the engine with **`new Jint.Engine(...)`**, fully qualified, using the same options as
@@ -50,6 +53,11 @@ Globals the script gets:
 Members can be called in camelCase or PascalCase (`http.send` and `http.Send` both work). Response
 fields are PascalCase (`HttpStatus`, `Content`).
 
+The script can also contain the token `{APIKey}`: before running it, the enricher replaces every
+`{APIKey}` with the value of the **API Key** field (an empty string when the field is empty). The
+API key is not passed to V2 scripts in any other way, so a sample for a service that needs a key
+starts with `const API_KEY = "{APIKey}";`.
+
 Output: set the global `response` to a JSON **string** of `[{ "Data": { "<vocab.key>": value, ... }, "Score": 100 }]`.
 An empty string or `"[]"` means no result.
 
@@ -72,6 +80,10 @@ script in Node.
   a slow API fails Test connection. Treat the placeholder as "no input" and return `"[]"` without
   calling the API; then Test connection checks only that the script runs. (Real enrichment allows
   120 seconds.)
+- **No User-Agent header is sent unless the script adds one.** `ScriptHttpClient` uses .NET's
+  `HttpClient`, which sends none. Some services reject such requests: the Hong Kong Companies
+  Registry answers 403, and OpenDART redirects to an HTML error page. curl and Node always send a
+  User-Agent, so check with `curl -H "User-Agent:" ...` and add a `User-Agent` header if needed.
 - **10,000 statements maximum.** Avoid looping over large responses character by character.
 - **Don't store an outage as a negative result.** If the API can't answer, log the reason and return
   `"[]"`. To make the enricher retry the record instead, throw an error whose message contains
@@ -105,6 +117,8 @@ script in Node.
 3. With the enricher active, processing those records runs it (or use the **Enrich** button). The
    results appear on the enricher's **Preview** tab first. They reach golden records only after you
    **Map** them (Auto Mapping into a vocabulary whose key prefix matches your `Data` keys) and
-   **Process** them. Auto Mapping may also use a `name` column as the golden record name.
+   **Process** them. Auto Mapping may also use a `name` column as the golden record name. When the
+   enricher landing zone feature is off, there is no **Preview** tab and the results go straight
+   onto the golden records.
 4. Check that the result merged into the **existing** golden record: one record, with both its
    original source and the REST API source on its **Properties** page.
