@@ -119,5 +119,29 @@ public static class SampleScriptRunner
         public object Get(string key) => _items.TryGetValue(key, out var value) ? value : null;
 
         public void Set(string key, object value, double expiration) => _items.TryAdd(key, value);
+
+        /// <summary>When true, GetOrSetFactory returns null as Helper.Cache does when its cluster-wide lock times out.</summary>
+        public bool LockTimesOut { get; set; }
+
+        public int FactoryCalls { get; private set; }
+
+        public object GetOrSetFactory(string key, Func<object> factory, double expiration)
+        {
+            var cached = Get(key);
+            if (cached != null)
+            {
+                return cached;
+            }
+
+            if (LockTimesOut)
+            {
+                return null;
+            }
+
+            FactoryCalls++;
+            var value = factory();
+            Set(key, value, expiration);
+            return value;
+        }
     }
 }
