@@ -23,9 +23,12 @@
     <EmbeddedResource Include="..\..\..\docs\samples\abn-lookup-australia\abn-process-script.js" Link="Samples\abn-process-script.js" LogicalName="Samples.abn-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\acra-singapore\acra-process-script.js" Link="Samples\acra-process-script.js" LogicalName="Samples.acra-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\brreg-norway\brreg-process-script.js" Link="Samples\brreg-process-script.js" LogicalName="Samples.brreg-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\cipc-south-africa\cipc-process-script.js" Link="Samples\cipc-process-script.js" LogicalName="Samples.cipc-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\cnpj-brazil\cnpj-process-script.js" Link="Samples\cnpj-process-script.js" LogicalName="Samples.cnpj-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\companies-registry-hong-kong\hkcr-process-script.js" Link="Samples\hkcr-process-script.js" LogicalName="Samples.hkcr-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\corporations-canada\corporations-canada-process-script.js" Link="Samples\corporations-canada-process-script.js" LogicalName="Samples.corporations-canada-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\dbd-thailand\dbd-process-script.js" Link="Samples\dbd-process-script.js" LogicalName="Samples.dbd-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\denue-mexico\denue-process-script.js" Link="Samples\denue-process-script.js" LogicalName="Samples.denue-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\e-business-register-estonia\ariregister-process-script.js" Link="Samples\ariregister-process-script.js" LogicalName="Samples.ariregister-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\gbizinfo-japan\gbizinfo-process-script.js" Link="Samples\gbizinfo-process-script.js" LogicalName="Samples.gbizinfo-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\kvk-netherlands\kvk-process-script.js" Link="Samples\kvk-process-script.js" LogicalName="Samples.kvk-process-script.js" />
@@ -33,6 +36,8 @@
     <EmbeddedResource Include="..\..\..\docs\samples\moea-taiwan\moea-process-script.js" Link="Samples\moea-process-script.js" LogicalName="Samples.moea-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\nzbn-new-zealand\nzbn-process-script.js" Link="Samples\nzbn-process-script.js" LogicalName="Samples.nzbn-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\opendart-south-korea\opendart-process-script.js" Link="Samples\opendart-process-script.js" LogicalName="Samples.opendart-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\rues-colombia\rues-process-script.js" Link="Samples\rues-process-script.js" LogicalName="Samples.rues-process-script.js" />
+    <EmbeddedResource Include="..\..\..\docs\samples\sec-philippines\secph-process-script.js" Link="Samples\secph-process-script.js" LogicalName="Samples.secph-process-script.js" />
     <EmbeddedResource Include="..\..\..\docs\samples\ytj-finland\ytj-process-script.js" Link="Samples\ytj-process-script.js" LogicalName="Samples.ytj-process-script.js" />
   </ItemGroup>
   <ItemGroup>
